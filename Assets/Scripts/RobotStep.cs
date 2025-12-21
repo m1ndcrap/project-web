@@ -1,20 +1,6 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Runtime.Serialization;
-using Unity.Burst.Intrinsics;
-using Unity.VisualScripting;
-using UnityEditor;
-using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using UnityEngine.Events;
-using UnityEngine.Playables;
-using UnityEngine.Tilemaps;
-using UnityEngine.UIElements;
-using static PlayerStep;
-using static UnityEngine.EventSystems.EventTrigger;
-using static UnityEngine.GraphicsBuffer;
-using static UnityEngine.UI.Image;
 
 public class RobotStep : MonoBehaviour
 {
@@ -86,8 +72,8 @@ public class RobotStep : MonoBehaviour
     [SerializeField] private GameObject hitParticlePrefab;
 
     // health bar
-    private int health = 55;
-    private int maxHealth = 55;
+    private int health = 25;
+    private int maxHealth = 25;
     HealthBar healthbar;
 
     // specialized vars for level objects

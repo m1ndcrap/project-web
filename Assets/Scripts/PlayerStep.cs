@@ -1,20 +1,11 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Runtime.Serialization;
-using Unity.VisualScripting;
 using UnityEditor;
-using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.Tilemaps;
 using UnityEngine.UI;
-using UnityEngine.UIElements;
-using static Cinemachine.CinemachineTargetGroup;
-using static RobotStep;
-using static UnityEngine.GraphicsBuffer;
-using static UnityEngine.UI.Image;
 
 public class PlayerStep : MonoBehaviour
 {
@@ -109,6 +100,7 @@ public class PlayerStep : MonoBehaviour
     [SerializeField] private AudioClip sndHealth;
     [SerializeField] public AudioClip sndCarBreak;
     [SerializeField] public AudioClip sndWarning;
+    [SerializeField] public AudioClip sndLevelComplete;
     private bool wasGrounded = false;
 
     // Alarms
@@ -116,6 +108,9 @@ public class PlayerStep : MonoBehaviour
     private int alarm2 = 0; // death timer before game ends/restarts
     private bool startAlarm2 = false;
     public int alarm3 = 0;
+    public int alarm4 = 0;
+
+    public bool trigger = false;
 
     // combat
     public RobotStep currentTarget = null;
@@ -139,8 +134,8 @@ public class PlayerStep : MonoBehaviour
     [SerializeField] private Text comboText;
 
     // health bar
-    [SerializeField] private int health = 100;
-    private int maxHealth = 100;
+    [SerializeField] private int health = 80;
+    private int maxHealth = 80;
     [SerializeField] HealthBar healthbar;
 
     [SerializeField] private Material noOutlineMaterial;
@@ -235,6 +230,14 @@ public class PlayerStep : MonoBehaviour
             }
         }
 
+        if (trigger)
+        {
+            if (alarm4 > 0)
+                alarm4 -= 1;
+            else
+                trigger = false;
+        }
+
         Vector2 origin = transform.position;
         float closestEDistanceC = Mathf.Infinity;
         RobotStep closestCounter = null;
@@ -260,13 +263,13 @@ public class PlayerStep : MonoBehaviour
 
         if (!countering) currentCounter = closestCounter;
 
-        if (currentCounter != null && !spiderSense && pState != PlayerState.death)
+        if ((trigger || currentCounter != null) && !spiderSense && pState != PlayerState.death)
         {
             Instantiate(sensePrefab, transform.position, Quaternion.Euler(0f, 0f, 0f));
             audioSrc.PlayOneShot(sndSpiderSense);
             spiderSense = true;
         }
-        else if (currentCounter == null)
+        else if (currentCounter == null || !trigger)
         {
             spiderSense = false;
         }
@@ -1966,17 +1969,36 @@ public class PlayerStep : MonoBehaviour
             Destroy(collision.gameObject, 0.1f);
         }
 
-        if (collision.gameObject.CompareTag("Trigger"))
+        if (pState != PlayerState.death && collision.gameObject.CompareTag("Arrow"))
+        {
+            audioSrc.PlayOneShot(sndLevelComplete);
+            #if UNITY_EDITOR
+                        EditorApplication.isPlaying = false;
+            #else
+                                    Application.Quit();
+            #endif
+        }
+
+        if (pState != PlayerState.death && collision.gameObject.CompareTag("Trigger"))
         {
             if (collision.gameObject.GetComponent<ObjectiveTrigger>().missionType == 1 && collision.gameObject.GetComponent<ObjectiveTrigger>().missionObjective.GetComponent<HostageScript>().phase == 0 && !collision.gameObject.GetComponent<ObjectiveTrigger>().active)
             {
                 collision.gameObject.GetComponent<ObjectiveTrigger>().countdown = true;
                 collision.gameObject.GetComponent<ObjectiveTrigger>().active = true;
                 collision.gameObject.GetComponent<ObjectiveTrigger>().start = true;
-                Instantiate(sensePrefab, transform.position, Quaternion.Euler(0f, 0f, 0f));
-                audioSrc.PlayOneShot(sndSpiderSense);
-                spiderSense = true;
+                trigger = true;
                 audioSrc.PlayOneShot(sndWarning);
+                alarm4 = 60;
+            }
+
+            if (collision.gameObject.GetComponent<ObjectiveTrigger>().missionType == 2 && !collision.gameObject.GetComponent<ObjectiveTrigger>().active)
+            {
+                collision.gameObject.GetComponent<ObjectiveTrigger>().countdown = true;
+                collision.gameObject.GetComponent<ObjectiveTrigger>().active = true;
+                collision.gameObject.GetComponent<ObjectiveTrigger>().start = true;
+                trigger = true;
+                audioSrc.PlayOneShot(sndWarning);
+                alarm4 = 60;
             }
         }
     }
@@ -2174,7 +2196,8 @@ public class PlayerStep : MonoBehaviour
             hitCooldown = 0.15f;
 
             float dir = sprite.flipX ? 1f : -1f;
-            rb.velocity = new Vector2(dir * 2f, 5f);
+            float dirY = collision.transform.position.y > transform.position.y ? -0.7f : 1f;
+            rb.velocity = new Vector2(dir * 2f, 5f * dirY);
             anim.speed = 1f;
             combo = 0;
 

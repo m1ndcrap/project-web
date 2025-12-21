@@ -17,6 +17,7 @@ TagManager:
   - Door
   - DoorSolid
   - Trigger
+  - Arrow
   layers:
   - Default
   - TransparentFX

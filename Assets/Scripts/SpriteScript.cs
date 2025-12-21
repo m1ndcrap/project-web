@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -10,11 +8,11 @@ public class SpriteScript : MonoBehaviour
 
     public void HitEvent()
     {
-        player.HitEvent(); // Call the parent's HitEvent
+        player.HitEvent();
     }
 
     public void PauseBeforeHit()
     {
-        player.PauseBeforeHit(); // Call the parent's HitEvent
+        player.PauseBeforeHit();
     }
 }

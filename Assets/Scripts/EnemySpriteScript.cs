@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -10,6 +8,6 @@ public class EnemySpriteScript : MonoBehaviour
 
     public void AttackEvent()
     {
-        enemy.AttackEvent(); // Call the parent's HitEvent
+        enemy.AttackEvent();
     }
 }

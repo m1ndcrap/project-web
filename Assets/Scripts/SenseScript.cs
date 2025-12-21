@@ -1,6 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
 
 public class SenseScript : MonoBehaviour
@@ -19,13 +16,12 @@ public class SenseScript : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (player.currentCounter == null || player.pState == PlayerStep.PlayerState.hurt)
+        if (player.currentCounter == null || player.pState == PlayerStep.PlayerState.hurt || !player.trigger)
         {
             Destroy(gameObject);
             return;
         }
 
-        // cache the mstate and normalizedTime
         int mstate = player.anim.GetInteger("mstate");
         float normalizedTime = player.anim.GetCurrentAnimatorStateInfo(0).normalizedTime % 1f;
         float dir = 1f;
@@ -361,12 +357,11 @@ public class SenseScript : MonoBehaviour
         }
     }
 
-    // Convert player-local offset to world position fast (no need for TransformPoint for simple addition)
     private Vector3 ToWorld(Transform playerTransform, Vector2 offset)
     {
         // If player flips horizontally (scale.x negative) you might want to flip the X offset:
-        // float signedOffsetX = offset.x * Mathf.Sign(playerTransform.localScale.x);
-        // return new Vector3(playerTransform.position.x + signedOffsetX, playerTransform.position.y + offset.y, transform.position.z);
+        //float signedOffsetX = offset.x * Mathf.Sign(playerTransform.localScale.x);
+        //return new Vector3(playerTransform.position.x + signedOffsetX, playerTransform.position.y + offset.y, transform.position.z);
 
         // For now we assume offsets are already correct for facing direction:
         return new Vector3(playerTransform.position.x + offset.x, playerTransform.position.y + offset.y, transform.position.z);
