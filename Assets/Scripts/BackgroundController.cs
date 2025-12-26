@@ -6,14 +6,12 @@ public class BackgroundController : MonoBehaviour
     [SerializeField] public GameObject cam;
     [SerializeField] public float parallaxSpeed;
 
-    // Start is called before the first frame update
     void Start()
     {
         startPos = transform.position.x;
         length = GetComponent<SpriteRenderer>().bounds.size.x;
     }
 
-    // Update is called once per frame
     void FixedUpdate()
     {
         float distance = cam.transform.position.x * parallaxSpeed;

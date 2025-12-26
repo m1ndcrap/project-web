@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class ObjectiveTrigger : MonoBehaviour
@@ -169,7 +170,9 @@ public class ObjectiveTrigger : MonoBehaviour
                 uiIcons.sprite = sprTimerIcons[0];
 
             uiIcons.rectTransform.anchoredPosition = Vector2.zero;
-            bgmController.GetComponent<BGMController>().intensity = 1;
+
+            if (SceneManager.GetActiveScene().name != "Test")
+                bgmController.GetComponent<BGMController>().intensity = 1;
 
             if (missionType == 1)
             {
@@ -258,7 +261,10 @@ public class ObjectiveTrigger : MonoBehaviour
             if (missionObjective.GetComponent<HostageScript>().phase != 0)
             {
                 countdown = false;
-                bgmController.GetComponent<BGMController>().intensity = 0;
+
+                if (SceneManager.GetActiveScene().name != "Test")
+                    bgmController.GetComponent<BGMController>().intensity = 0;
+                
                 completed = true;
                 uiStart.canvasRenderer.SetAlpha(0);
                 uiArrow.canvasRenderer.SetAlpha(0);
@@ -285,7 +291,10 @@ public class ObjectiveTrigger : MonoBehaviour
             if (numAlive == 0)
             {
                 countdown = false;
-                bgmController.GetComponent<BGMController>().intensity = 0;
+
+                if (SceneManager.GetActiveScene().name != "Test")
+                    bgmController.GetComponent<BGMController>().intensity = 0;
+                
                 completed = true;
                 uiStart.canvasRenderer.SetAlpha(0);
                 uiArrow.canvasRenderer.SetAlpha(0);

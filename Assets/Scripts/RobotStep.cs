@@ -221,7 +221,7 @@ public class RobotStep : MonoBehaviour
                     int index = UnityEngine.Random.Range(0, clips.Length);
                     if (index < clips.Length) { audioSrc.PlayOneShot(clips[index]); }
                     rb.gravityScale = 0;
-                    int hitIndex = UnityEngine.Random.Range(0, 3); // random number 0-6
+                    int hitIndex = UnityEngine.Random.Range(0, 3);
                     MovementState mstate = MovementState.idle;
 
                     switch (hitIndex)

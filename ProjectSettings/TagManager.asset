@@ -18,6 +18,7 @@ TagManager:
   - DoorSolid
   - Trigger
   - Arrow
+  - Web
   layers:
   - Default
   - TransparentFX

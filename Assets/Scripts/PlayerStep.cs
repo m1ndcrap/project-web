@@ -119,6 +119,7 @@ public class PlayerStep : MonoBehaviour
     [SerializeField] private LayerMask enemyMask;
     private float dash_spd = 0f;
     public UnityEvent<RobotStep> OnHit;
+    public UnityEvent<GoblinStep> OnHitG;
     [SerializeField] private bool waitingToHit = false;
     [SerializeField] private GameObject hitParticlePrefab;
     [SerializeField] private GameObject hurtParticlePrefab;
@@ -129,7 +130,7 @@ public class PlayerStep : MonoBehaviour
     [SerializeField] private bool pastHitEvent = false;
     [SerializeField] private GameObject webPrefab;
     [SerializeField] private GameObject sensePrefab;
-    private bool spiderSense = false;
+    public bool spiderSense = false;
     public int combo = 0;
     [SerializeField] private Text comboText;
 
@@ -1972,11 +1973,12 @@ public class PlayerStep : MonoBehaviour
         if (pState != PlayerState.death && collision.gameObject.CompareTag("Arrow"))
         {
             audioSrc.PlayOneShot(sndLevelComplete);
-            #if UNITY_EDITOR
+            collision.gameObject.GetComponent<GoalArrow>().levelComplete();
+            /*#if UNITY_EDITOR
                         EditorApplication.isPlaying = false;
             #else
                                     Application.Quit();
-            #endif
+            #endif*/
         }
 
         if (pState != PlayerState.death && collision.gameObject.CompareTag("Trigger"))
