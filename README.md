@@ -1,2 +1,1 @@
-# 2D-spider-man-framework
-A WIP repository for a 2D Spider-Man framework to use in Unity. Credit if used!
+Project WEB is a unity 2D framework to use for creating 2D games where the player can swing, zip across platforms, and shoot projectiles using webs. This also has combat with a counter system.
