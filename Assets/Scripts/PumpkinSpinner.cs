@@ -1,54 +1,38 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class PumpkinSpinner : MonoBehaviour
 {
-    [Header("References")]
-    public Transform player;
-    public SpriteRenderer spriteRenderer;
+    public PlayerStep player;
     public Animator animator;
     public AudioSource audioSource;
-
-    [Header("Sprites")]
-    public Sprite pumpkinBoomSprite;
-
-    [Header("Sounds")]
-    public AudioClip spiderSense;
     public AudioClip pumpkinBoom;
-    public AudioClip[] goblinLaughs;
-
-    // --- GameMaker variables ---
+    [SerializeField] public AudioClip sndGLaugh1;
+    [SerializeField] public AudioClip sndGLaugh2;
+    [SerializeField] public AudioClip sndGLaugh3;
     float[] attractAcc = new float[2];
     public float hspeed;
     private float vspeed;
-
-    int i = 0;
     public int dir = 1;
     public bool airborne = false;
-    private bool ready = false;
-
     int phase = 0;
-    float targX;
-
     int hit = 3;
     bool canHit = true;
-
     float xstart;
+    float targX;
 
     void Start()
     {
+        player = FindObjectOfType<PlayerStep>();
         attractAcc[0] = 0.45f;
         attractAcc[1] = 0.15f;
-
-        targX = player.position.x;
         xstart = transform.position.x;
-
-        // Spider sense trigger
-        PlayerStep p = player.GetComponent<PlayerStep>();
-        p.spiderSense = true;
-        audioSource.PlayOneShot(spiderSense, 1f);
-
+        targX = player.transform.position.x;
+        player.spiderSense = true;
+        player.trigger = true;
+        player.alarm4 = 60;
         transform.rotation = Quaternion.identity;
     }
 
@@ -71,8 +55,8 @@ public class PumpkinSpinner : MonoBehaviour
     {
         Vector2 pos = transform.position;
 
-        int playerX = Sign(player.position.x - pos.x);
-        int playerY = Sign(player.position.y - pos.y);
+        int playerX = Sign(player.transform.position.x - pos.x);
+        int playerY = Sign(player.transform.position.y - pos.y);
 
         bool movX = Sign(hspeed) == playerX;
         bool movY = Sign(vspeed) == playerY;
@@ -85,28 +69,24 @@ public class PumpkinSpinner : MonoBehaviour
 
     void ApplyMovement()
     {
-        transform.position += new Vector3(
-            hspeed,
-            vspeed,
-            0f
-        ) * Time.deltaTime * 60f;
+        transform.position += new Vector3(0.02f * hspeed, 0.02f * vspeed, 0f) * Time.deltaTime * 60f;
     }
 
     void Explode()
     {
+        AnimatorStateInfo stateInfo = animator.GetCurrentAnimatorStateInfo(0);
+
         hspeed = 0;
         vspeed = 0;
 
-        if (spriteRenderer.sprite != pumpkinBoomSprite)
+        if (stateInfo.IsName("SpinnerNormal"))
         {
-            spriteRenderer.sprite = pumpkinBoomSprite;
             transform.localScale = Vector3.one * 1.4f;
-
             audioSource.PlayOneShot(pumpkinBoom, 1f);
-            animator.Play("PumpkinBoom");
+            animator.Play("SpinnerBoom");
         }
 
-        if (animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1f)
+        if (stateInfo.IsName("SpinnerBoom") && stateInfo.normalizedTime >= 1f)
         {
             Destroy(gameObject);
         }
@@ -115,11 +95,9 @@ public class PumpkinSpinner : MonoBehaviour
     void TriggerExplosion()
     {
         if (phase != 0) return;
-
         phase = 1;
-        audioSource.PlayOneShot(
-            goblinLaughs[Random.Range(0, goblinLaughs.Length)], 0.7f
-        );
+        AudioClip[] clips = { sndGLaugh1, sndGLaugh2, sndGLaugh3 };
+        audioSource.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
     }
 
     void OnTriggerEnter2D(Collider2D other)
@@ -137,23 +115,36 @@ public class PumpkinSpinner : MonoBehaviour
 
             if (p.pState != PlayerStep.PlayerState.death && phase == 0 && hit == 0)
             {
-                /*if (airborne)
-                    p.enemyDir = dir;
+                if (player.pState == PlayerStep.PlayerState.death) return;
+
+                float dir = 0;
+                dir = (transform.position.x < player.transform.position.x) ? 1f : -1f;
+                /*
+                if (airborne)
+                    dir = player.sprite.flipX ? 1f : -1f;
                 else
-                    p.enemyDir = (xstart > targX) ? -1 : 1;*/
+                    dir = (xstart > targX) ? -1 : 1;*/
 
-                float scale = Mathf.Abs(other.transform.localScale.x);
-                other.transform.localScale = new Vector3(
-                    transform.position.x < other.transform.position.x ? -scale : scale,
-                    other.transform.localScale.y,
-                    other.transform.localScale.z
-                );
+                player.rb.velocity = new Vector2(dir * 2f, 5f);
+                player.anim.speed = 1f;
+                player.combo = 0;
+                player.pState = PlayerStep.PlayerState.hurt;
 
-                //p.LaunchHit(2);
+                PlayerStep.MovementState mstate = PlayerStep.MovementState.launched;
+                player.anim.SetInteger("mstate", (int)mstate);
+
+                player.health -= 4;
+                player.healthbar.UpdateHealthBar(player.health, player.maxHealth);
+
+                AudioClip[] clips = { player.sndHurt, player.sndHurt2, player.sndHurt3 };
+                player.audioSrc.PlayOneShot(clips[Random.Range(0, clips.Length)]);
+
+                AudioClip[] clips2 = { sndGLaugh1, sndGLaugh2, sndGLaugh3 };
+                audioSource.PlayOneShot(clips2[Random.Range(0, clips2.Length)]);
                 TriggerExplosion();
             }
         }
-        else if (other.CompareTag("Wall"))
+        else if (other.CompareTag("Ground"))
         {
             if (hit > 0 && canHit)
             {

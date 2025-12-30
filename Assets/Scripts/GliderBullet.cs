@@ -108,16 +108,34 @@ public class GliderBullet : MonoBehaviour
 
         if (other.CompareTag("Player"))
         {
-            PlayerStep p = other.GetComponent<PlayerStep>();
-            if (p.pState != PlayerStep.PlayerState.death)
-            {
-               /* if (direction <= 90 || direction > 270)
-                    p.enemyDir = 1;
-                else
-                    p.enemyDir = -1;
+            if (player.pState == PlayerStep.PlayerState.death) return;
 
-                p.LightHit(2);*/
-            }
+            float dir = (transform.position.x > player.transform.position.x) ? -1 : 1;
+
+            player.rb.velocity = new Vector2(dir, 0f);
+            player.anim.speed = 1f;
+            player.combo = 0;
+            player.pState = PlayerStep.PlayerState.hurt;
+
+            PlayerStep.MovementState mstate;
+            int hitIndex = UnityEngine.Random.Range(0, 2);
+
+            if (hitIndex == 0)
+                mstate = PlayerStep.MovementState.hurt1;
+            else
+                mstate = PlayerStep.MovementState.hurt2;
+
+            player.anim.SetInteger("mstate", (int)mstate);
+
+            AudioClip[] clips2 = { player.sndQuickHit, player.sndQuickHit2 };
+            int index2 = Random.Range(0, clips2.Length);
+            if (index2 < clips2.Length) { player.audioSrc.PlayOneShot(clips2[index2]); }
+
+            player.health -= 2;
+            player.healthbar.UpdateHealthBar(player.health, player.maxHealth);
+
+            AudioClip[] clips = { player.sndHurt, player.sndHurt2, player.sndHurt3 };
+            player.audioSrc.PlayOneShot(clips[Random.Range(0, clips.Length)]);
 
             phase = 1;
         }

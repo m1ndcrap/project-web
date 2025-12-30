@@ -4,16 +4,17 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.SceneManagement;
 using UnityEngine.Tilemaps;
 using UnityEngine.UI;
 
 public class PlayerStep : MonoBehaviour
 {
-    private Rigidbody2D rb;
+    public Rigidbody2D rb;
     [SerializeField] public Animator anim;
     [SerializeField] public SpriteRenderer sprite;
     [SerializeField] private Transform visual;
-    private BoxCollider2D coll;
+    public BoxCollider2D coll;
     private float dirX = 0f;
     private float dirY = 0f;
 
@@ -25,8 +26,9 @@ public class PlayerStep : MonoBehaviour
     private float grappleX = 0f;
     private float grappleY = 0f;
     private float ropeLength = 0f;
-    private bool swingEnd = false;
+    public bool swingEnd = false;
     [SerializeField] private float accelerationRate = -0.02f;
+    [SerializeField] private bool swingPointSelected = false;
 
     // Crawling Variables
     [SerializeField] private bool groundDetected;
@@ -47,34 +49,35 @@ public class PlayerStep : MonoBehaviour
     // Zip Variables
     [SerializeField] private Transform quickZipTarget;
     [SerializeField] private Tilemap tilemap; // Assign in inspector
-    private Vector2? moveTarget = null;
+    public Vector2? moveTarget = null;
 
     [SerializeField] private LayerMask jumpableGround;
+    [SerializeField] private LayerMask swingPoint;
     [SerializeField] private float hsp = 4f; // Horizontal speed
-    [SerializeField] private float jspd = 5f;    // Jump speed
+    [SerializeField] public float jspd = 5f;    // Jump speed
     [SerializeField] public GameObject ropeSegmentPrefab; // Assign in Inspector
     private float ropeSegmentLength = 0.15f; // Distance between segments
     private List<GameObject> ropeSegments = new List<GameObject>(); // Track segments
     private Queue<GameObject> ropeSegmentPool = new Queue<GameObject>();
     private int maxPoolSize = 200; // Optional limit
 
-    private enum MovementState { idle, running, jumping, falling, swinging, endswing, crawling, zip, groundshoot, airshoot, crawlshoot, punch1, punch2, punch3, punch4, airkick, airpunch, kick1, kick2, uppercut, launched, hurt1, hurt2, block1, block2, block3, block4, death }
+    public enum MovementState { idle, running, jumping, falling, swinging, endswing, crawling, zip, groundshoot, airshoot, crawlshoot, punch1, punch2, punch3, punch4, airkick, airpunch, kick1, kick2, uppercut, launched, hurt1, hurt2, block1, block2, block3, block4, death }
     public enum PlayerState { normal, swing, crawl, quickzip, dashenemy, hurt, death }
     public PlayerState pState;
 
     // Sound Files
-    [SerializeField] private AudioSource audioSrc;
+    [SerializeField] public AudioSource audioSrc;
     [SerializeField] private AudioClip sndJump;
     [SerializeField] private AudioClip sndJump2;
-    [SerializeField] private AudioClip sndSwing;
-    [SerializeField] private AudioClip sndSwing2;
-    [SerializeField] private AudioClip sndSwing3;
+    [SerializeField] public AudioClip sndSwing;
+    [SerializeField] public AudioClip sndSwing2;
+    [SerializeField] public AudioClip sndSwing3;
     [SerializeField] private AudioClip sndLand;
     [SerializeField] private AudioClip sndLand2;
     [SerializeField] private AudioClip sndHardLand;
     [SerializeField] private AudioClip sndHardLand2;
     [SerializeField] private AudioClip sndWebSnap;
-    [SerializeField] private AudioClip sndWebRelease;
+    [SerializeField] public AudioClip sndWebRelease;
     [SerializeField] private AudioClip sndWebTension;
     [SerializeField] private AudioClip sndWebTension2;
     [SerializeField] private AudioClip sndWebTension3;
@@ -93,9 +96,9 @@ public class PlayerStep : MonoBehaviour
     [SerializeField] public AudioClip sndQuickHit2;
     [SerializeField] public AudioClip sndStrongHit;
     [SerializeField] public AudioClip sndStrongHit2;
-    [SerializeField] private AudioClip sndHurt;
-    [SerializeField] private AudioClip sndHurt2;
-    [SerializeField] private AudioClip sndHurt3;
+    [SerializeField] public AudioClip sndHurt;
+    [SerializeField] public AudioClip sndHurt2;
+    [SerializeField] public AudioClip sndHurt3;
     [SerializeField] private AudioClip sndSpiderSense;
     [SerializeField] private AudioClip sndHealth;
     [SerializeField] public AudioClip sndCarBreak;
@@ -114,6 +117,7 @@ public class PlayerStep : MonoBehaviour
 
     // combat
     public RobotStep currentTarget = null;
+    public GoblinStep boss = null;
     public RobotStep currentCounter = null;
     public bool isEnemyAttacking = false;
     [SerializeField] private LayerMask enemyMask;
@@ -135,9 +139,9 @@ public class PlayerStep : MonoBehaviour
     [SerializeField] private Text comboText;
 
     // health bar
-    [SerializeField] private int health = 80;
-    private int maxHealth = 80;
-    [SerializeField] HealthBar healthbar;
+    [SerializeField] public int health = 80;
+    [SerializeField] public int maxHealth = 80;
+    [SerializeField] public HealthBar healthbar;
 
     [SerializeField] private Material noOutlineMaterial;
 
@@ -157,6 +161,7 @@ public class PlayerStep : MonoBehaviour
         direction = 1;
         rb.interpolation = RigidbodyInterpolation2D.Interpolate;
         healthbar.UpdateHealthBar(health, maxHealth);
+        boss = FindObjectOfType<GoblinStep>();
     }
 
     // Update is called once per frame
@@ -320,18 +325,22 @@ public class PlayerStep : MonoBehaviour
                 {
                     Vector2 playerPos = transform.position;
                     Vector2 inputDir = new Vector2(dirX * 2.5f, -dirY * 1.25f);
-                    Vector2 searchOrigin = (Vector2)playerPos + inputDir;
+                    Vector2 searchOrigin = playerPos + inputDir;
 
-                    Debug.DrawLine(transform.position, searchOrigin, UnityEngine.Color.cyan);
+                    Debug.DrawLine(transform.position, searchOrigin, Color.cyan);
 
-                    Collider2D[] hits = Physics2D.OverlapCircleAll(searchOrigin, 3f, jumpableGround);
+                    LayerMask combinedMask = jumpableGround | swingPoint;
+                    Collider2D[] hits = Physics2D.OverlapCircleAll(searchOrigin, 3f, combinedMask);
                     float closestDistance = float.MaxValue;
                     Vector2 bestAttachPoint = Vector2.zero;
+                    bool bestIsSwingPoint = false;
                     bool found = false;
 
                     foreach (Collider2D hit in hits)
                     {
-                        Vector2 point = hit.ClosestPoint(searchOrigin); // get closest contact point
+                        bool isSwingPoint = ((1 << hit.gameObject.layer) & swingPoint) != 0;
+                        Vector2 point = isSwingPoint ? (Vector2)hit.transform.position : hit.ClosestPoint(searchOrigin);
+                        //Vector2 point = hit.ClosestPoint(searchOrigin); // get closest contact point
                         Vector2 directionToPoint = (point - playerPos).normalized;
 
                         if (point.y <= playerPos.y) continue; // skip if below player
@@ -340,10 +349,21 @@ public class PlayerStep : MonoBehaviour
 
                         float dist = Vector2.Distance(playerPos, point);
 
-                        if (dist < closestDistance)
+                        bool shouldReplace = !found || (isSwingPoint && !bestIsSwingPoint) || (isSwingPoint == bestIsSwingPoint && dist < closestDistance);
+
+                        /*if (dist < closestDistance)
                         {
                             closestDistance = dist;
                             bestAttachPoint = point;
+                            found = true;
+                        }*/
+
+                        if (shouldReplace)
+                        {
+                            closestDistance = dist;
+                            bestAttachPoint = point;
+                            bestIsSwingPoint = isSwingPoint;
+                            swingPointSelected = bestIsSwingPoint;
                             found = true;
                         }
                     }
@@ -595,10 +615,9 @@ public class PlayerStep : MonoBehaviour
 
                 currentTarget = closestEnemy;
 
-
-
                 if (Input.GetKey(KeyCode.O) && currentTarget != null)   // normal attack
                 {
+                    rb.velocity = new Vector2(0f, 0f);
                     if (Math.Abs(currentTarget.transform.position.x - transform.position.x) > 3.75f) {dash_spd = 16f;}
                     if (Math.Abs(currentTarget.transform.position.x - transform.position.x) > 2.5f && Math.Abs(currentTarget.transform.position.x - transform.position.x) <= 3.75f) {dash_spd = 12;}
                     if (Math.Abs(currentTarget.transform.position.x - transform.position.x) > 1.25f && Math.Abs(currentTarget.transform.position.x - transform.position.x) <= 2.5f) {dash_spd = 8f;}
@@ -643,6 +662,55 @@ public class PlayerStep : MonoBehaviour
                     anim.SetInteger("mstate", (int)mstate);
                     rb.gravityScale = 0;
                 }
+                else if (Input.GetKey(KeyCode.O) && SceneManager.GetActiveScene().name == "Boss" && Math.Abs(boss.transform.position.x - transform.position.x) <= 5f)
+                {
+                    rb.velocity = new Vector2(0f, 0f);
+                    if (Math.Abs(boss.transform.position.x - transform.position.x) > 3.75f) { dash_spd = 16f; }
+                    if (Math.Abs(boss.transform.position.x - transform.position.x) > 2.5f && Math.Abs(boss.transform.position.x - transform.position.x) <= 3.75f) { dash_spd = 12; }
+                    if (Math.Abs(boss.transform.position.x - transform.position.x) > 1.25f && Math.Abs(boss.transform.position.x - transform.position.x) <= 2.5f) { dash_spd = 8f; }
+                    if (Math.Abs(boss.transform.position.x - transform.position.x) >= 0f && Math.Abs(boss.transform.position.x - transform.position.x) <= 1.25f) { dash_spd = 4f; }
+                    attacking = true;
+
+                    if (pState != PlayerState.dashenemy)
+                    {
+                        AudioClip[] clips = { sndAttack, sndAttack2, sndAttack3 };
+                        int index = UnityEngine.Random.Range(0, clips.Length + 1); // +1 to include "no sound"
+                        if (index < clips.Length) { audioSrc.PlayOneShot(clips[index]); }
+
+                        AudioClip[] clips2 = { sndSwipe, sndSwipe2, sndSwipe3 };
+                        int index2 = UnityEngine.Random.Range(0, clips2.Length);
+                        if (index2 < clips2.Length) { audioSrc.PlayOneShot(clips2[index2]); }
+
+                        pState = PlayerState.dashenemy;
+                    }
+
+                    //pState = PlayerState.dashenemy;
+                    anim.speed = 2f;
+                    MovementState mstate = MovementState.idle;
+
+                    if (Grounded())
+                    {
+                        int hitIndex = UnityEngine.Random.Range(0, 7); // random number 0-6
+
+                        switch (hitIndex)
+                        {
+                            case 0: { mstate = MovementState.punch1; } break;
+                            case 1: { mstate = MovementState.punch2; } break;
+                            case 2: { mstate = MovementState.punch3; } break;
+                            case 3: { mstate = MovementState.punch4; } break;
+                            case 4: { mstate = MovementState.kick1; } break;
+                            case 5: { mstate = MovementState.kick2; } break;
+                            case 6: { mstate = MovementState.airpunch; } break;
+                        }
+                    }
+                    else
+                    {
+                        mstate = MovementState.airkick;
+                    }
+
+                    anim.SetInteger("mstate", (int)mstate);
+                    rb.gravityScale = 0;
+                }
                 else if (Input.GetKey(KeyCode.O) && currentTarget == null)
                 {
                     dash_spd = 0f;
@@ -651,11 +719,11 @@ public class PlayerStep : MonoBehaviour
                     {
                         AudioClip[] clips = { sndAttack, sndAttack2, sndAttack3 };
                         int index = UnityEngine.Random.Range(0, clips.Length + 1); // +1 to include "no sound"
-                        if (index < clips.Length) {audioSrc.PlayOneShot(clips[index]);}
-                        
+                        if (index < clips.Length) { audioSrc.PlayOneShot(clips[index]); }
+
                         AudioClip[] clips2 = { sndSwipe, sndSwipe2, sndSwipe3 };
                         int index2 = UnityEngine.Random.Range(0, clips2.Length);
-                        if (index2 < clips2.Length) {audioSrc.PlayOneShot(clips2[index2]);}
+                        if (index2 < clips2.Length) { audioSrc.PlayOneShot(clips2[index2]); }
 
                         pState = PlayerState.dashenemy;
                     }
@@ -698,6 +766,25 @@ public class PlayerStep : MonoBehaviour
 
                     AudioClip[] clips = { sndAttack, sndAttack2, sndAttack3 };
                     int index = UnityEngine.Random.Range(0, clips.Length + 1); // +1 to include "no sound"
+                    if (index < clips.Length) {audioSrc.PlayOneShot(clips[index]);}
+                        
+                    AudioClip[] clips2 = { sndSwipe, sndSwipe2, sndSwipe3 };
+                    int index2 = UnityEngine.Random.Range(0, clips2.Length);
+                    if (index2 < clips2.Length) {audioSrc.PlayOneShot(clips2[index2]);}
+                }
+                else if (Input.GetKey(KeyCode.L) && SceneManager.GetActiveScene().name == "Boss" && Math.Abs(boss.transform.position.x - transform.position.x) <= 5f && Grounded())
+                {
+                    dash_spd = 4f;
+                    pState = PlayerState.dashenemy;
+                    anim.speed = 2f;
+                    MovementState mstate = MovementState.uppercut;
+                    anim.SetInteger("mstate", (int)mstate);
+                    attacking = true;
+                    uppercut = true;
+                    rb.gravityScale = 0;
+
+                    AudioClip[] clips = { sndAttack, sndAttack2, sndAttack3 };
+                    int index = UnityEngine.Random.Range(0, clips.Length + 1); 
                     if (index < clips.Length) {audioSrc.PlayOneShot(clips[index]);}
                         
                     AudioClip[] clips2 = { sndSwipe, sndSwipe2, sndSwipe3 };
@@ -796,6 +883,13 @@ public class PlayerStep : MonoBehaviour
 
             case PlayerState.swing:
             {
+                if (swingPointSelected)
+                {
+                    GameObject swingPointObj = GameObject.Find("SwingPoint");
+                    grappleX = swingPointObj.transform.position.x;
+                    grappleY = swingPointObj.transform.position.y;
+                }
+
                 float ropeAngleAcceleration = accelerationRate * Mathf.Cos(ropeAngle * Mathf.Deg2Rad); //-0.02
                 dirX = Input.GetAxisRaw("Horizontal");
                 dirY = -Input.GetAxisRaw("Vertical"); //key up returns -1, key down returns +1
@@ -828,6 +922,7 @@ public class PlayerStep : MonoBehaviour
                     coll.offset = new Vector2(-0.03511286f, -0.03012538f);
 
                     audioSrc.PlayOneShot(sndWebRelease);
+                    swingPointSelected = false;
 
                     pState = PlayerState.normal;
 
@@ -852,6 +947,7 @@ public class PlayerStep : MonoBehaviour
                     coll.size = new Vector2(0.8397379f, 1.615343f);
                     coll.offset = new Vector2(-0.03511286f, -0.03012538f);
                     audioSrc.PlayOneShot(sndWebSnap);
+                    swingPointSelected = false;
                     pState = PlayerState.normal;
                     ReturnAllRopeSegmentsToPool();
                     rb.gravityScale = 1;
@@ -880,6 +976,7 @@ public class PlayerStep : MonoBehaviour
                     coll.size = new Vector2(0.8397379f, 1.615343f);
                     coll.offset = new Vector2(-0.03511286f, -0.03012538f);
                     audioSrc.PlayOneShot(sndWebSnap);
+                    swingPointSelected = false;
                     pState = PlayerState.crawl;
                     ReturnAllRopeSegmentsToPool();
                     rb.gravityScale = 0;
@@ -1120,72 +1217,14 @@ public class PlayerStep : MonoBehaviour
 
             case PlayerState.dashenemy:
             {
-                if (attacking && currentTarget == null) { attacking = false; }
+                if ((attacking && currentTarget == null && SceneManager.GetActiveScene().name != "Boss") || (attacking && currentTarget == null && SceneManager.GetActiveScene().name == "Boss" && Math.Abs(boss.transform.position.x - transform.position.x) > 5f)) { attacking = false; }
 
                 if (attacking)
                 {
-                    currentTarget.rb.velocity = new Vector2(0f, currentTarget.rb.velocity.y);
-                    rb.velocity = new Vector2(0f, 0f);
-
-                    if (currentTarget.Grounded())
-                    {
-                        if ((Math.Abs(currentTarget.transform.position.x - transform.position.x) >= 0.45f) && !waitingToHit && ((stateInfo.IsName("Player_Air_Kick") && stateInfo.normalizedTime <= 0.86f) || (stateInfo.IsName("Player_Air_Punch") && stateInfo.normalizedTime <= 0.67f) || (stateInfo.IsName("Player_Kick1") && stateInfo.normalizedTime <= 0.65f) || (stateInfo.IsName("Player_Kick2") && stateInfo.normalizedTime <= 0.46f) || (stateInfo.IsName("Player_Punch1") && stateInfo.normalizedTime <= 0.52f) || (stateInfo.IsName("Player_Punch2") && stateInfo.normalizedTime <= 0.48f) || (stateInfo.IsName("Player_Punch3") && stateInfo.normalizedTime <= 0.25f) || (stateInfo.IsName("Player_Punch4") && stateInfo.normalizedTime <= 0.45f) || (stateInfo.IsName("Player_Uppercut") && stateInfo.normalizedTime <= 0.33f)))
-                        {
-                            float step = dash_spd * Time.deltaTime;
-                            transform.position = Vector2.MoveTowards(transform.position, currentTarget.transform.position, step);
-                        }
-
-                        if (waitingToHit)
-                        {
-                            float dist = Mathf.Abs(currentTarget.transform.position.x - transform.position.x);
-                            if (dist < 0.45f)
-                            {
-                                anim.speed = 1;
-                                waitingToHit = false;
-                            }
-                            else
-                            {
-                                // Keep moving toward the enemy
-                                float step = dash_spd * Time.deltaTime;
-                                transform.position = Vector2.MoveTowards(transform.position, currentTarget.transform.position, step);
-                            }
-                        }
-                    }
+                    if (SceneManager.GetActiveScene().name == "Boss")
+                        Attacking(boss.gameObject);
                     else
-                    {
-                        if ((Vector2.Distance(transform.position, currentTarget.transform.position) >= 0.2f) && !waitingToHit && ((stateInfo.IsName("Player_Air_Kick") && stateInfo.normalizedTime <= 0.86f) || (stateInfo.IsName("Player_Air_Punch") && stateInfo.normalizedTime <= 0.67f) || (stateInfo.IsName("Player_Kick1") && stateInfo.normalizedTime <= 0.65f) || (stateInfo.IsName("Player_Kick2") && stateInfo.normalizedTime <= 0.46f) || (stateInfo.IsName("Player_Punch1") && stateInfo.normalizedTime <= 0.52f) || (stateInfo.IsName("Player_Punch2") && stateInfo.normalizedTime <= 0.48f) || (stateInfo.IsName("Player_Punch3") && stateInfo.normalizedTime <= 0.25f) || (stateInfo.IsName("Player_Punch4") && stateInfo.normalizedTime <= 0.45f) || (stateInfo.IsName("Player_Uppercut") && stateInfo.normalizedTime <= 0.33f)))
-                        {
-                            float step = dash_spd * Time.deltaTime;
-                            transform.position = Vector2.MoveTowards(transform.position, currentTarget.transform.position, step);
-                        }
-
-                        if (waitingToHit)
-                        {
-                            float dist = Vector2.Distance(transform.position, currentTarget.transform.position);
-                            if (dist < 0.2f)
-                            {
-                                anim.speed = 1;
-                                waitingToHit = false;
-                            }
-                            else
-                            {
-                                // Keep moving toward the enemy
-                                float step = dash_spd * Time.deltaTime;
-                                transform.position = Vector2.MoveTowards(transform.position, currentTarget.transform.position, step);
-                            }
-                        }
-                    }
-
-                    if (stateInfo.normalizedTime >= 1f)
-                    {
-                        pastHitEvent = false;
-                        pState = PlayerState.normal;
-                        attacking = false;
-                        uppercut = false;
-                        currentTarget.rb.gravityScale = 1;
-                        currentTarget.hsp = 1f;
-                        rb.gravityScale = 1;
-                    }
+                        Attacking(currentTarget.gameObject);
 
                     if (pastHitEvent)
                     {
@@ -1312,6 +1351,40 @@ public class PlayerStep : MonoBehaviour
                             rb.gravityScale = 0;
                             pastHitEvent = false;
                         }
+                        else if (Input.GetKey(KeyCode.O) && SceneManager.GetActiveScene().name == "Boss" && Math.Abs(boss.transform.position.x - transform.position.x) <= 5f)
+                        {
+                            if (Math.Abs(boss.transform.position.x - transform.position.x) > 3.75f) { dash_spd = 16f; }
+                            if (Math.Abs(boss.transform.position.x - transform.position.x) > 2.5f && Math.Abs(boss.transform.position.x - transform.position.x) <= 3.75f) { dash_spd = 12; }
+                            if (Math.Abs(boss.transform.position.x - transform.position.x) > 1.25f && Math.Abs(boss.transform.position.x - transform.position.x) <= 2.5f) { dash_spd = 8f; }
+                            if (Math.Abs(boss.transform.position.x - transform.position.x) >= 0f && Math.Abs(boss.transform.position.x - transform.position.x) <= 1.25f) { dash_spd = 4f; }
+                            attacking = true;
+                            pState = PlayerState.dashenemy;
+                            anim.speed = 2f;
+                            MovementState mstate = MovementState.idle;
+                            if (Grounded())
+                            {
+                                int hitIndex = UnityEngine.Random.Range(0, 7); // random number 0-6
+
+                                switch (hitIndex)
+                                {
+                                    case 0: { mstate = MovementState.punch1; } break;
+                                    case 1: { mstate = MovementState.punch2; } break;
+                                    case 2: { mstate = MovementState.punch3; } break;
+                                    case 3: { mstate = MovementState.punch4; } break;
+                                    case 4: { mstate = MovementState.kick1; } break;
+                                    case 5: { mstate = MovementState.kick2; } break;
+                                    case 6: { mstate = MovementState.airpunch; } break;
+                                }
+                            }
+                            else
+                            {
+                                mstate = MovementState.airkick;
+                            }
+
+                            anim.SetInteger("mstate", (int)mstate);
+                            rb.gravityScale = 0;
+                            pastHitEvent = false;
+                        }
                         else if (Input.GetKey(KeyCode.O) && currentTarget == null)
                         {
                             dash_spd = 0f;
@@ -1345,6 +1418,18 @@ public class PlayerStep : MonoBehaviour
                         }
 
                         if (Input.GetKey(KeyCode.L) && currentTarget != null && Mathf.Abs(currentTarget.transform.position.x - origin.x) <= 1f && Grounded())   // uppercut
+                        {
+                            dash_spd = 4f;
+                            pState = PlayerState.dashenemy;
+                            anim.speed = 2f;
+                            MovementState mstate = MovementState.uppercut;
+                            anim.SetInteger("mstate", (int)mstate);
+                            attacking = true;
+                            uppercut = true;
+                            rb.gravityScale = 0;
+                            pastHitEvent = false;
+                        }
+                        else if (Input.GetKey(KeyCode.L) && SceneManager.GetActiveScene().name == "Boss" && Math.Abs(boss.transform.position.x - transform.position.x) <= 5f && Grounded())
                         {
                             dash_spd = 4f;
                             pState = PlayerState.dashenemy;
@@ -1687,7 +1772,7 @@ public class PlayerStep : MonoBehaviour
         return segment;
     }
 
-    void ReturnAllRopeSegmentsToPool()
+    public void ReturnAllRopeSegmentsToPool()
     {
         foreach (var seg in ropeSegments)
         {
@@ -1845,8 +1930,16 @@ public class PlayerStep : MonoBehaviour
 
     public void HitEvent()
     {
-        if (attacking && ((Grounded() && (Vector3.Distance(currentTarget.transform.position, transform.position) <= 0.45f)) || (!Grounded() && (Vector3.Distance(currentTarget.transform.position, transform.position) <= 0.9f)))) { OnHit.Invoke(currentTarget); if (!pastHitEvent) { pastHitEvent = true; } combo += 1; alarm3 = 300; }
-        if (countering && ((Grounded() && (Vector3.Distance(currentCounter.transform.position, transform.position) <= 0.45f)) || (!Grounded() && (Vector3.Distance(currentCounter.transform.position, transform.position) <= 0.9f)))) { OnHit.Invoke(currentCounter); combo += 1; alarm3 = 300; }
+        if (SceneManager.GetActiveScene().name != "Boss")
+        {
+            if (attacking && ((Grounded() && (Vector3.Distance(currentTarget.transform.position, transform.position) <= 0.45f)) || (!Grounded() && (Vector3.Distance(currentTarget.transform.position, transform.position) <= 0.9f)))) { OnHit.Invoke(currentTarget); if (!pastHitEvent) { pastHitEvent = true; } combo += 1; alarm3 = 300; }
+            if (countering && ((Grounded() && (Vector3.Distance(currentCounter.transform.position, transform.position) <= 0.45f)) || (!Grounded() && (Vector3.Distance(currentCounter.transform.position, transform.position) <= 0.9f)))) { OnHit.Invoke(currentCounter); combo += 1; alarm3 = 300; }
+        }
+        else
+        {
+            if (attacking && ((Grounded() && (Vector3.Distance(boss.transform.position, transform.position) <= 0.45f)) || (!Grounded() && (Vector3.Distance(boss.transform.position, transform.position) <= 0.9f)))) { OnHitG.Invoke(boss); if (!pastHitEvent) { pastHitEvent = true; } combo += 1; alarm3 = 300; }
+            if (countering && ((Grounded() && (Vector3.Distance(boss.transform.position, transform.position) <= 0.45f)) || (!Grounded() && (Vector3.Distance(boss.transform.position, transform.position) <= 0.9f)))) { OnHitG.Invoke(boss); combo += 1; alarm3 = 300; }
+        }
     }
 
     public void PauseBeforeHit()
@@ -1854,23 +1947,52 @@ public class PlayerStep : MonoBehaviour
         if (attacking)
         {
             anim.speed = 0;
-            currentTarget.anim.speed = 0;
-            currentTarget.rb.velocity = new Vector2(0f, 0f);
+
+            if (SceneManager.GetActiveScene().name != "Boss")
+            {
+                currentTarget.anim.speed = 0;
+                currentTarget.rb.velocity = new Vector2(0f, 0f);
+            }
+            else
+            {
+                if (boss.gState == GoblinStep.GoblinState.engaged)
+                {
+                    boss.anim.speed = 0;
+                    boss.rb.velocity = new Vector2(0f, 0f);
+                }
+            }
+
             waitingToHit = true; // Flag to resume when player reaches enemy
         }
 
         if (countering)
         {
             anim.speed = 0;
-            currentCounter.anim.speed = 0;
-            currentCounter.rb.velocity = new Vector2(0f, 0f);
+
+            if (SceneManager.GetActiveScene().name != "Boss")
+            {
+                currentCounter.anim.speed = 0;
+                currentCounter.rb.velocity = new Vector2(0f, 0f);
+            }
+            else
+            {
+                boss.anim.speed = 0;
+                boss.rb.velocity = new Vector2(0f, 0f);
+            }
+
             waitingToHit = true; // Flag to resume when player reaches enemy
         }
     }
 
     public void SpawnHitEffect(Vector2 impactPoint)
     {
-        Vector3 hitPosition = (transform.position + currentTarget.transform.position) / 2f;
+        Vector3 hitPosition;
+
+        if (SceneManager.GetActiveScene().name == "Boss")
+            hitPosition = (transform.position + boss.transform.position) / 2f;
+        else
+            hitPosition = (transform.position + currentTarget.transform.position) / 2f;
+
         GameObject hitFX = Instantiate(hitParticlePrefab, impactPoint, Quaternion.identity);
     }
 
@@ -1955,6 +2077,164 @@ public class PlayerStep : MonoBehaviour
             {
                 currentCounter.OnPlayerHit(currentCounter);
             }
+        }
+    }
+
+    public void DamageGoblin(GoblinStep target)
+    {
+        if (pState != PlayerState.death)
+        {
+            if (!countering)
+            {
+                float dir = 0;
+
+                if (!target.sprite.flipX)
+                {
+                    dir = 1f;
+                    dirX = -1f;
+                }
+                else
+                {
+                    dir = -1f;
+                    dirX = 1f;
+                }
+
+                rb.velocity = new Vector2(dir, 0f);
+                anim.speed = 1f;
+                combo = 0;
+                pState = PlayerState.hurt;
+                MovementState mstate;
+
+                int hitIndex = UnityEngine.Random.Range(0, 2);
+
+                if (hitIndex == 0)
+                    mstate = MovementState.hurt1;
+                else
+                    mstate = MovementState.hurt2;
+
+                AudioClip[] clips2 = { sndQuickHit, sndQuickHit2 };
+                int index2 = UnityEngine.Random.Range(0, clips2.Length);
+                if (index2 < clips2.Length) { audioSrc.PlayOneShot(clips2[index2]); }
+
+                anim.SetInteger("mstate", (int)mstate);
+
+                Vector2 hitPoint = target.transform.position;
+                enemyHitSpawn = target.transform.position;
+                SpawnHurtEffect(hitPoint);
+
+                if (health > 0)
+                {
+                    health -= 3;
+                    healthbar.UpdateHealthBar(health, maxHealth);
+                }
+
+                AudioClip[] clips = { sndHurt, sndHurt2, sndHurt3 };
+                int index = UnityEngine.Random.Range(0, clips.Length);
+                if (index < clips.Length) { audioSrc.PlayOneShot(clips[index]); }
+            }
+            else
+            {
+                target.OnPlayerHit(target);
+            }
+        }
+    }
+
+    private void Attacking(GameObject target)
+    {
+        Rigidbody2D rb_target = target.GetComponent<Rigidbody2D>();
+
+        bool grounded = false;
+
+        if (SceneManager.GetActiveScene().name == "Boss")
+            grounded = target.GetComponent<GoblinStep>().Grounded();
+        else
+            grounded = target.GetComponent<RobotStep>().Grounded();
+
+        if (SceneManager.GetActiveScene().name == "Boss")
+        {
+            if (rb_target.GetComponent<GoblinStep>().gState == GoblinStep.GoblinState.engaged)
+            {
+                rb_target.velocity = new Vector2(0f, 0f);
+            }
+        }
+        else
+        {
+            //rb_target.velocity = new Vector2(0f, rb_target.velocity.y);
+            rb_target.velocity = new Vector2(0f, 0f);
+        }
+
+        AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
+
+        if (grounded)
+        {
+            if ((Math.Abs(target.transform.position.x - transform.position.x) >= 0.45f) && !waitingToHit && ((stateInfo.IsName("Player_Air_Kick") && stateInfo.normalizedTime <= 0.86f) || (stateInfo.IsName("Player_Air_Punch") && stateInfo.normalizedTime <= 0.67f) || (stateInfo.IsName("Player_Kick1") && stateInfo.normalizedTime <= 0.65f) || (stateInfo.IsName("Player_Kick2") && stateInfo.normalizedTime <= 0.46f) || (stateInfo.IsName("Player_Punch1") && stateInfo.normalizedTime <= 0.52f) || (stateInfo.IsName("Player_Punch2") && stateInfo.normalizedTime <= 0.48f) || (stateInfo.IsName("Player_Punch3") && stateInfo.normalizedTime <= 0.25f) || (stateInfo.IsName("Player_Punch4") && stateInfo.normalizedTime <= 0.45f) || (stateInfo.IsName("Player_Uppercut") && stateInfo.normalizedTime <= 0.33f)))
+            {
+                float step = dash_spd * Time.deltaTime;
+                transform.position = Vector2.MoveTowards(transform.position, target.transform.position, step);
+            }
+
+            if (waitingToHit)
+            {
+                float dist = Mathf.Abs(target.transform.position.x - transform.position.x);
+                if (dist < 0.45f)
+                {
+                    anim.speed = 1;
+                    waitingToHit = false;
+                }
+                else
+                {
+                    // Keep moving toward the enemy
+                    float step = dash_spd * Time.deltaTime;
+                    transform.position = Vector2.MoveTowards(transform.position, target.transform.position, step);
+                }
+            }
+        }
+        else
+        {
+            if ((Vector2.Distance(transform.position, target.transform.position) >= 0.2f) && !waitingToHit && ((stateInfo.IsName("Player_Air_Kick") && stateInfo.normalizedTime <= 0.86f) || (stateInfo.IsName("Player_Air_Punch") && stateInfo.normalizedTime <= 0.67f) || (stateInfo.IsName("Player_Kick1") && stateInfo.normalizedTime <= 0.65f) || (stateInfo.IsName("Player_Kick2") && stateInfo.normalizedTime <= 0.46f) || (stateInfo.IsName("Player_Punch1") && stateInfo.normalizedTime <= 0.52f) || (stateInfo.IsName("Player_Punch2") && stateInfo.normalizedTime <= 0.48f) || (stateInfo.IsName("Player_Punch3") && stateInfo.normalizedTime <= 0.25f) || (stateInfo.IsName("Player_Punch4") && stateInfo.normalizedTime <= 0.45f) || (stateInfo.IsName("Player_Uppercut") && stateInfo.normalizedTime <= 0.33f)))
+            {
+                float step = dash_spd * Time.deltaTime;
+                transform.position = Vector2.MoveTowards(transform.position, target.transform.position, step);
+            }
+
+            if (waitingToHit)
+            {
+                float dist = Vector2.Distance(transform.position, target.transform.position);
+                if (dist < 0.2f)
+                {
+                    anim.speed = 1;
+                    waitingToHit = false;
+                }
+                else
+                {
+                    // Keep moving toward the enemy
+                    float step = dash_spd * Time.deltaTime;
+                    transform.position = Vector2.MoveTowards(transform.position, target.transform.position, step);
+                }
+            }
+        }
+
+        if (stateInfo.normalizedTime >= 1f)
+        {
+            pastHitEvent = false;
+            pState = PlayerState.normal;
+            attacking = false;
+            uppercut = false;
+
+            if (SceneManager.GetActiveScene().name == "Boss")
+            {
+                if (rb_target.GetComponent<GoblinStep>().gState == GoblinStep.GoblinState.engaged)
+                {
+                    rb_target.gravityScale = 1;
+                }
+            }
+            else
+            {
+                rb_target.gravityScale = 1;
+            }
+
+            //target.hsp = 1f;
+            rb.gravityScale = 1;
         }
     }
 

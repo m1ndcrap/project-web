@@ -1,12 +1,13 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Burst.Intrinsics;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.U2D;
 
 public class PumpkinProjectile : MonoBehaviour
 {
     public PlayerStep player;
-    [SerializeField] public SpriteRenderer spriteRenderer;
     [SerializeField] public Animator animator;
     [SerializeField] public AudioSource audioSource;
     [SerializeField] public AudioClip pumpkinBoom;
@@ -15,29 +16,21 @@ public class PumpkinProjectile : MonoBehaviour
     [SerializeField] public AudioClip sndGLaugh3;
     [SerializeField] public bool airborne = false;
     public int dir = 1;
-
-    // Internal state
     float i = 0;
     bool ready = false;
     int phase = 0;
-
     float xstart;
     float ystart;
     float targX;
-
-    
 
     void Start()
     {
         player = FindObjectOfType<PlayerStep>();
         xstart = transform.position.x;
         ystart = transform.position.y;
-
         targX = player.transform.position.x;
-
         player.trigger = true;
         player.alarm4 = 60;
-
         transform.rotation = Quaternion.identity;
     }
 
@@ -127,25 +120,33 @@ public class PumpkinProjectile : MonoBehaviour
 
         if (other.CompareTag("Player"))
         {
-            PlayerStep p = other.GetComponent<PlayerStep>();
-            if (p.pState == PlayerStep.PlayerState.death) return;
+            if (player.pState == PlayerStep.PlayerState.death) return;
 
-/*
+            float dir = 0;
+            dir = (transform.position.x < player.transform.position.x) ? 1f : -1f;
+
+            /*
             if (airborne)
-                p.enemyDir = dir;
+                dir = (transform.position.x < player.transform.position.x) ? 1f : -1f;
             else
-                p.enemyDir = (xstart > targX) ? -1 : 1;*/
+                dir = (xstart > targX) ? -1 : 1;*/
 
-            float origScale = Mathf.Abs(other.transform.localScale.x);
-            other.transform.localScale = new Vector3(
-                transform.position.x < other.transform.position.x ? -origScale : origScale,
-                other.transform.localScale.y,
-                other.transform.localScale.z
-            );
+            player.rb.velocity = new Vector2(dir * 2f, 5f);
+            player.anim.speed = 1f;
+            player.combo = 0;
+            player.pState = PlayerStep.PlayerState.hurt;
 
-            AudioClip[] clips = { sndGLaugh1, sndGLaugh2, sndGLaugh3 };
-            audioSource.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
-            //p.LaunchHit(4);
+            PlayerStep.MovementState mstate = PlayerStep.MovementState.launched;
+            player.anim.SetInteger("mstate", (int)mstate);
+
+            player.health -= 4;
+            player.healthbar.UpdateHealthBar(player.health, player.maxHealth);
+
+            AudioClip[] clips = { player.sndHurt, player.sndHurt2, player.sndHurt3 };
+            player.audioSrc.PlayOneShot(clips[Random.Range(0, clips.Length)]);
+
+            AudioClip[] clips2 = { sndGLaugh1, sndGLaugh2, sndGLaugh3 };
+            audioSource.PlayOneShot(clips2[Random.Range(0, clips2.Length)]);
             TriggerExplosion();
         }
         else if (other.CompareTag("Ground"))
