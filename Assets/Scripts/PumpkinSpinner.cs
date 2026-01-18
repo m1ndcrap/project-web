@@ -18,7 +18,7 @@ public class PumpkinSpinner : MonoBehaviour
     public int dir = 1;
     public bool airborne = false;
     int phase = 0;
-    int hit = 3;
+    int hit = 2;
     bool canHit = true;
     float xstart;
     float targX;
@@ -97,7 +97,7 @@ public class PumpkinSpinner : MonoBehaviour
         if (phase != 0) return;
         phase = 1;
         AudioClip[] clips = { sndGLaugh1, sndGLaugh2, sndGLaugh3 };
-        audioSource.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
+        audioSource.PlayOneShot(clips[Random.Range(0, clips.Length)]);
     }
 
     void OnTriggerEnter2D(Collider2D other)
@@ -119,18 +119,21 @@ public class PumpkinSpinner : MonoBehaviour
 
                 float dir = 0;
                 dir = (transform.position.x < player.transform.position.x) ? 1f : -1f;
-                /*
-                if (airborne)
-                    dir = player.sprite.flipX ? 1f : -1f;
-                else
-                    dir = (xstart > targX) ? -1 : 1;*/
 
-                player.rb.velocity = new Vector2(dir * 2f, 5f);
+                player.rb.velocity = new Vector2(dir * 1.5f, 0f);
                 player.anim.speed = 1f;
                 player.combo = 0;
                 player.pState = PlayerStep.PlayerState.hurt;
 
-                PlayerStep.MovementState mstate = PlayerStep.MovementState.launched;
+                PlayerStep.MovementState mstate = PlayerStep.MovementState.idle;
+
+                int hitIndex = Random.Range(0, 2); // 0 or 1
+
+                if (hitIndex == 0)
+                    mstate = PlayerStep.MovementState.hurt1;
+                else
+                    mstate = PlayerStep.MovementState.hurt2;
+                
                 player.anim.SetInteger("mstate", (int)mstate);
 
                 player.health -= 4;

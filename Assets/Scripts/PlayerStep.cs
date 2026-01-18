@@ -2165,6 +2165,11 @@ public class PlayerStep : MonoBehaviour
 
         AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
 
+        if (target.transform.position.x > transform.position.x)
+            sprite.flipX = false;
+        else
+            sprite.flipX = true;
+
         if (grounded)
         {
             if ((Math.Abs(target.transform.position.x - transform.position.x) >= 0.45f) && !waitingToHit && ((stateInfo.IsName("Player_Air_Kick") && stateInfo.normalizedTime <= 0.86f) || (stateInfo.IsName("Player_Air_Punch") && stateInfo.normalizedTime <= 0.67f) || (stateInfo.IsName("Player_Kick1") && stateInfo.normalizedTime <= 0.65f) || (stateInfo.IsName("Player_Kick2") && stateInfo.normalizedTime <= 0.46f) || (stateInfo.IsName("Player_Punch1") && stateInfo.normalizedTime <= 0.52f) || (stateInfo.IsName("Player_Punch2") && stateInfo.normalizedTime <= 0.48f) || (stateInfo.IsName("Player_Punch3") && stateInfo.normalizedTime <= 0.25f) || (stateInfo.IsName("Player_Punch4") && stateInfo.normalizedTime <= 0.45f) || (stateInfo.IsName("Player_Uppercut") && stateInfo.normalizedTime <= 0.33f)))
@@ -2183,7 +2188,6 @@ public class PlayerStep : MonoBehaviour
                 }
                 else
                 {
-                    // Keep moving toward the enemy
                     float step = dash_spd * Time.deltaTime;
                     transform.position = Vector2.MoveTowards(transform.position, target.transform.position, step);
                 }
@@ -2191,25 +2195,73 @@ public class PlayerStep : MonoBehaviour
         }
         else
         {
-            if ((Vector2.Distance(transform.position, target.transform.position) >= 0.2f) && !waitingToHit && ((stateInfo.IsName("Player_Air_Kick") && stateInfo.normalizedTime <= 0.86f) || (stateInfo.IsName("Player_Air_Punch") && stateInfo.normalizedTime <= 0.67f) || (stateInfo.IsName("Player_Kick1") && stateInfo.normalizedTime <= 0.65f) || (stateInfo.IsName("Player_Kick2") && stateInfo.normalizedTime <= 0.46f) || (stateInfo.IsName("Player_Punch1") && stateInfo.normalizedTime <= 0.52f) || (stateInfo.IsName("Player_Punch2") && stateInfo.normalizedTime <= 0.48f) || (stateInfo.IsName("Player_Punch3") && stateInfo.normalizedTime <= 0.25f) || (stateInfo.IsName("Player_Punch4") && stateInfo.normalizedTime <= 0.45f) || (stateInfo.IsName("Player_Uppercut") && stateInfo.normalizedTime <= 0.33f)))
+            if (target == null)
             {
-                float step = dash_spd * Time.deltaTime;
-                transform.position = Vector2.MoveTowards(transform.position, target.transform.position, step);
+                waitingToHit = false;
+                pState = PlayerState.normal;
+                attacking = false;
+                rb.gravityScale = 1;
+                return;
+            }
+
+            rb.gravityScale = 0;
+            rb.velocity = Vector2.zero;
+            rb.angularVelocity = 0;
+
+            float attackDist = 0.2f;
+            float stopDist = 0.05f;
+            float step = dash_spd * Time.deltaTime;
+
+            if (SceneManager.GetActiveScene().name == "Boss")
+            {
+                if (target.GetComponent<GoblinStep>().gState == GoblinStep.GoblinState.on_glider)
+                    attackDist = 0.15f;
+            }
+
+            Vector2 targetPos = target.transform.position;
+            Vector2 currentPos = transform.position;
+            float dist = Vector2.Distance(currentPos, targetPos);
+
+            bool shouldMove = (dist >= attackDist) && !waitingToHit &&
+                ((stateInfo.IsName("Player_Air_Kick") && stateInfo.normalizedTime <= 0.86f) ||
+                 (stateInfo.IsName("Player_Air_Punch") && stateInfo.normalizedTime <= 0.67f) ||
+                 (stateInfo.IsName("Player_Kick1") && stateInfo.normalizedTime <= 0.65f) ||
+                 (stateInfo.IsName("Player_Kick2") && stateInfo.normalizedTime <= 0.46f) ||
+                 (stateInfo.IsName("Player_Punch1") && stateInfo.normalizedTime <= 0.52f) ||
+                 (stateInfo.IsName("Player_Punch2") && stateInfo.normalizedTime <= 0.48f) ||
+                 (stateInfo.IsName("Player_Punch3") && stateInfo.normalizedTime <= 0.25f) ||
+                 (stateInfo.IsName("Player_Punch4") && stateInfo.normalizedTime <= 0.45f) ||
+                 (stateInfo.IsName("Player_Uppercut") && stateInfo.normalizedTime <= 0.33f));
+
+            if (shouldMove && dist > stopDist)
+            {
+                float actualStep = Mathf.Min(step, dist - stopDist);
+                if (actualStep > 0)
+                {
+                    Vector2 newPos = Vector2.MoveTowards(currentPos, targetPos, actualStep);
+                    transform.position = newPos;
+                }
             }
 
             if (waitingToHit)
             {
-                float dist = Vector2.Distance(transform.position, target.transform.position);
-                if (dist < 0.2f)
+                targetPos = target.transform.position;
+                currentPos = transform.position;
+                dist = Vector2.Distance(currentPos, targetPos);
+
+                if (dist < attackDist)
                 {
                     anim.speed = 1;
                     waitingToHit = false;
                 }
-                else
+                else if (dist > stopDist)
                 {
-                    // Keep moving toward the enemy
-                    float step = dash_spd * Time.deltaTime;
-                    transform.position = Vector2.MoveTowards(transform.position, target.transform.position, step);
+                    float actualStep = Mathf.Min(step, dist - stopDist);
+                    if (actualStep > 0)
+                    {
+                        Vector2 newPos = Vector2.MoveTowards(currentPos, targetPos, actualStep);
+                        transform.position = newPos;
+                    }
                 }
             }
         }

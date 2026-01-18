@@ -42,6 +42,13 @@ public class GliderScript : MonoBehaviour
 
     public SpriteRenderer sr;
 
+    public GoblinPath[] paths;
+
+    private GoblinPath currentPath;
+    private int index;
+    private float speed;
+    private bool active;
+
     void Start()
     {
         sr = GetComponent<SpriteRenderer>();
@@ -89,28 +96,28 @@ public class GliderScript : MonoBehaviour
         if (state != GState.AirFight)
         {
             startedPath = false;
+            StopPath();
             ptSpeed = 0;
             return;
         }
 
         if (!startedPath)
         {
+            StartRandomPath(ptSpeed);
             startedPath = true;
         }
 
         float dist = Vector2.Distance(transform.position, player.transform.position);
-        ptSpeed = Mathf.Lerp(0.25f, 2f, 1f - (dist / 1110f));
+        ptSpeed = Mathf.Lerp(0.02f, 0.16f, (1f - (dist / 1110f)) * 0.08f);
 
-        bool playerDanger = (player.GetComponent<PlayerStep>().pState == PlayerStep.PlayerState.dashenemy || (player.GetComponent<PlayerStep>().pState == PlayerStep.PlayerState.dashenemy && Vector3.Distance(player.transform.position, transform.position) <= 5.2f));
+        bool playerDanger = player.GetComponent<PlayerStep>().attacking; // || (player.GetComponent<PlayerStep>().attacking && Vector3.Distance(player.transform.position, transform.position) <= 5.2f)
 
-        if (playerDanger && !goblin.blocking)
-            ptSpeed = 0;
+        if (playerDanger) // && !goblin.blocking
+            SetSpeed(0f);
+        else
+            SetSpeed(ptSpeed);
 
-        transform.position = Vector2.MoveTowards(
-            transform.position,
-            player.transform.position,
-            ptSpeed * Time.deltaTime * 60f
-        );
+        //transform.position = Vector2.MoveTowards(transform.position, player.transform.position, ptSpeed * Time.deltaTime * 60f);
     }
 
     void Shooting()
@@ -255,6 +262,20 @@ public class GliderScript : MonoBehaviour
             goblin.gState = GoblinStep.GoblinState.on_glider;
 
         sr.flipX = transform.position.x > player.transform.position.x;
+
+        if (player.GetComponent<PlayerStep>().attacking)
+            return;
+
+        if (!active || currentPath == null) return;
+        Transform target = currentPath.points[index];
+        transform.position = Vector2.MoveTowards(transform.position, target.position, speed * Time.deltaTime * 60f);
+
+        if (Vector2.Distance(transform.position, target.position) < 0.05f)
+        {
+            index++;
+            if (index >= currentPath.points.Length)
+                index = 0;
+        }
     }
 
     void HandleAlarms()
@@ -272,5 +293,23 @@ public class GliderScript : MonoBehaviour
         {
             shot = false;
         }
+    }
+
+    public void StartRandomPath(float startSpeed)
+    {
+        currentPath = paths[Random.Range(0, paths.Length)];
+        index = 0;
+        speed = startSpeed;
+        active = true;
+    }
+
+    public void StopPath()
+    {
+        active = false;
+    }
+
+    public void SetSpeed(float s)
+    {
+        speed = s;
     }
 }
