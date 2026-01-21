@@ -74,7 +74,7 @@ public class GoblinStep : MonoBehaviour
     // health bar
     public int health = 300;
     private int maxHealth = 300;
-    HealthBar healthbar;
+    BossHealth healthbar;
 
     [SerializeField] public bool blocking = false;
     [SerializeField] public GliderScript glider;
@@ -101,7 +101,7 @@ public class GoblinStep : MonoBehaviour
         sndQuickHit2 = player.sndQuickHit2;
         sndStrongHit = player.sndStrongHit;
         sndStrongHit2 = player.sndStrongHit2;
-        healthbar = GetComponentInChildren<HealthBar>();
+        healthbar = FindObjectOfType<BossHealth>();
         healthbar.UpdateHealthBar(health, maxHealth);
     }
 
