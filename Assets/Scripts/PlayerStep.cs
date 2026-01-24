@@ -290,6 +290,9 @@ public class PlayerStep : MonoBehaviour
 
         if (combo == 0) comboText.text = ""; else comboText.text = "x" + combo;
 
+        if (pState != PlayerState.quickzip && pState != PlayerState.swing)
+            ReturnAllRopeSegmentsToPool();
+
         switch (pState)
         {
             case PlayerState.normal:
@@ -1140,6 +1143,11 @@ public class PlayerStep : MonoBehaviour
                     Vector2 currentPos = rb.position;
                     Vector2 target = moveTarget.Value;
                     Vector2 zipDir = (target - currentPos).normalized;
+
+                    if (target.x > currentPos.x)
+                        sprite.flipX = false;
+                    else
+                        sprite.flipX = true;
 
                     if (zipDir != Vector2.zero)
                     {
@@ -2172,6 +2180,10 @@ public class PlayerStep : MonoBehaviour
 
         if (grounded)
         {
+            rb.gravityScale = 0;
+            rb.velocity = Vector2.zero;
+            rb.angularVelocity = 0;
+
             if ((Math.Abs(target.transform.position.x - transform.position.x) >= 0.45f) && !waitingToHit && ((stateInfo.IsName("Player_Air_Kick") && stateInfo.normalizedTime <= 0.86f) || (stateInfo.IsName("Player_Air_Punch") && stateInfo.normalizedTime <= 0.67f) || (stateInfo.IsName("Player_Kick1") && stateInfo.normalizedTime <= 0.65f) || (stateInfo.IsName("Player_Kick2") && stateInfo.normalizedTime <= 0.46f) || (stateInfo.IsName("Player_Punch1") && stateInfo.normalizedTime <= 0.52f) || (stateInfo.IsName("Player_Punch2") && stateInfo.normalizedTime <= 0.48f) || (stateInfo.IsName("Player_Punch3") && stateInfo.normalizedTime <= 0.25f) || (stateInfo.IsName("Player_Punch4") && stateInfo.normalizedTime <= 0.45f) || (stateInfo.IsName("Player_Uppercut") && stateInfo.normalizedTime <= 0.33f)))
             {
                 float step = dash_spd * Time.deltaTime;

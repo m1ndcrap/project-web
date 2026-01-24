@@ -3,6 +3,8 @@ using UnityEngine;
 public class SenseScript : MonoBehaviour
 {
     [SerializeField] private PlayerStep player;
+    float dir = 1f;
+    int mstate = 0;
 
     // Start is called before the first frame update
     void Start()
@@ -11,6 +13,8 @@ public class SenseScript : MonoBehaviour
         {
             player = FindObjectOfType<PlayerStep>();
         }
+        
+        CalculateSensePosition();
     }
 
     // Update is called once per frame
@@ -22,10 +26,14 @@ public class SenseScript : MonoBehaviour
             return;
         }
 
-        int mstate = player.anim.GetInteger("mstate");
-        float normalizedTime = player.anim.GetCurrentAnimatorStateInfo(0).normalizedTime % 1f;
-        float dir = 1f;
+        CalculateSensePosition();
+    }
+
+    private void CalculateSensePosition()
+    {
         if (player.sprite.flipX) dir = -1f; else dir = 1f;
+        mstate = player.anim.GetInteger("mstate");
+        float normalizedTime = player.anim.GetCurrentAnimatorStateInfo(0).normalizedTime % 1f;
 
         switch (mstate)
         {
@@ -34,7 +42,7 @@ public class SenseScript : MonoBehaviour
                 transform.position = ToWorld(player.transform, new Vector2(0.023f * dir, 0.284f));
                 transform.rotation = Quaternion.Euler(0f, 0f, 0f);
                 break;
-            
+
             // positioning when running
             case 1:
                 transform.position = ToWorld(player.transform, new Vector2(0.125f * dir, 0.248f));

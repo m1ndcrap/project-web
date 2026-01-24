@@ -62,7 +62,6 @@ public class GoblinStep : MonoBehaviour
     // Combat
     private Material outline;
     [SerializeField] private PlayerStep player;
-    [SerializeField] private bool shocked = false;
     public UnityEvent<PlayerStep> OnAttack;
     public bool kick = false;
     public bool attacking = false;
@@ -88,7 +87,6 @@ public class GoblinStep : MonoBehaviour
     [SerializeField] private GameObject goblinSpinnerPrefab;
     private bool canAttack = true;
 
-    // Start is called before the first frame update
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -105,7 +103,6 @@ public class GoblinStep : MonoBehaviour
         healthbar.UpdateHealthBar(health, maxHealth);
     }
 
-    // Update is called once per frame
     void Update()
     {
         if (glider.state != GState.GroundFight && glider.state != GState.AirFight && glider.state != GState.Zooming) { blocking = false; }
