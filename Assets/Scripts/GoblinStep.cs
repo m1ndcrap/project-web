@@ -432,7 +432,7 @@ public class GoblinStep : MonoBehaviour
                     if (!startAlarm11) { alarm11 = 5; startAlarm11 = true; }
 	            }
 	
-	            if (throwing) { dirX = 0; }
+	            if (throwing) { dirX = 0; if (player.transform.position.x > transform.position.x) { sprite.flipX = false; } else { sprite.flipX = true; } }
 	            if (!throwing && threw) {alarm12 = 90; threw = false;}
 	            if (!throwing) {spinners = false;}
 	            if (threw) {spinners = false;}
@@ -454,8 +454,18 @@ public class GoblinStep : MonoBehaviour
 		            {
                         int dirS = sprite.flipX ? -1 : 1;
 
-                        SpawnSpinner(dirS, RandomChoice(2, 4, 6, 8));
-                        SpawnSpinner(dirS, RandomChoice(4, 8, 12, 16));
+                        if (player.transform.position.y < transform.position.y)
+                        {
+                            SpawnSpinner(dirS, RandomChoice(16, 18, 20));
+                            SpawnSpinner(dirS, RandomChoice(18, 18, 19));
+                            SpawnSpinner(dirS, RandomChoice(17, 19));
+                        }
+                        else
+                        {
+                            SpawnSpinner(dirS, RandomChoice(2, 4, 6, 8));
+                            SpawnSpinner(dirS, RandomChoice(4, 8, 12, 16));
+                            SpawnSpinner(dirS, RandomChoice(3, 6, 9, 12));
+                        }
 
                         AudioClip clip = UnityEngine.Random.value < 0.5f ? sndGSpinner1 : sndGSpinner1;
                         audioSrc.PlayOneShot(clip);
