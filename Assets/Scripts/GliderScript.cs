@@ -31,10 +31,10 @@ public class GliderScript : MonoBehaviour
     private bool startedPath;
 
     private float targetX, targetY;
-    private float iniX, iniY;
+    private float iniX;
     [SerializeField] private float i = 0f;
-    private float yChange;
-    private float xOff;
+    private float xOff = 4.6f;
+    private float xOffDir = 1f;
     private float ptSpeed;
 
     private float alarm0Timer;
@@ -133,7 +133,6 @@ public class GliderScript : MonoBehaviour
                 case 1: { transform.position = new Vector2(screenRight, 7.59f); } break;
             }
             iniX = transform.position.x;
-            iniY = transform.position.y;
             i = iniX - targetX;
             moving = true;
         }
@@ -201,7 +200,13 @@ public class GliderScript : MonoBehaviour
     {
         moving = false;
         float spd = Mathf.Lerp(0, 6, Mathf.Abs(transform.position.x - player.transform.position.x) / 150f);
-        transform.position = Vector2.MoveTowards(transform.position, new Vector2(player.transform.position.x + xOff, player.transform.position.y + 1.2f), spd * Time.deltaTime * 60f);
+
+        if (Input.GetAxisRaw("Horizontal") != 0f)
+            xOff = 0.956f;
+        else
+            xOff = 4.6f;
+
+        transform.position = Vector2.MoveTowards(transform.position, new Vector2(player.transform.position.x + (xOff * xOffDir), player.transform.position.y + 1.2f), spd * Time.deltaTime * 60f);
         sr.flipX = player.transform.position.x < transform.position.x;
     }
 
@@ -285,7 +290,7 @@ public class GliderScript : MonoBehaviour
 
         if (alarm0Timer <= 0)
         {
-            xOff = Random.Range(-0.956f, 0.956f);
+            xOffDir = Random.Range(0, 2) == 0 ? -1f : 1f;
             alarm0Timer = 180f;
         }
 

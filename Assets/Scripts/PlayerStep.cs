@@ -1589,6 +1589,8 @@ public class PlayerStep : MonoBehaviour
 
             case PlayerState.hurt:
             {
+                visual.rotation = Quaternion.Euler(0f, 0f, 0f);
+                transform.rotation = Quaternion.Euler(0f, 0f, 0f);
                 uppercut = false;
                 rb.gravityScale = 1;
                 attacking = false;
@@ -2568,6 +2570,49 @@ public class PlayerStep : MonoBehaviour
 
             AudioClip[] clips = { sndHurt, sndHurt2, sndHurt3 };
             audioSrc.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
+        }
+
+        if (collision.gameObject.CompareTag("Glider"))
+        {
+            if (collision.gameObject.GetComponent<GliderScript>().state == GliderScript.GState.Zooming)
+            {
+                if (pState == PlayerState.death) return;
+
+                rb.WakeUp();
+                rb.position = rb.position;
+
+                if (hitCooldown > 0f)
+                {
+                    hitCooldown -= Time.deltaTime;
+                    return;
+                }
+
+                hitCooldown = 0.02f;
+
+                float dir = sprite.flipX ? 1f : -1f;
+                float dirY = collision.transform.position.y > transform.position.y ? -0.7f : 1f;
+                rb.velocity = new Vector2(dir * 2f, 5f * dirY);
+                anim.speed = 1f;
+                combo = 0;
+
+                pState = PlayerState.hurt;
+                MovementState mstate = MovementState.launched;
+
+                AudioClip[] clips2 = { sndStrongHit, sndStrongHit2 };
+                audioSrc.PlayOneShot(clips2[UnityEngine.Random.Range(0, clips2.Length)]);
+
+                anim.SetInteger("mstate", (int)mstate);
+
+                Vector2 hitPoint = transform.position;
+                enemyHitSpawn = collision.transform.position;
+                SpawnHurtEffect(hitPoint);
+
+                health -= 3;
+                healthbar.UpdateHealthBar(health, maxHealth);
+
+                AudioClip[] clips = { sndHurt, sndHurt2, sndHurt3 };
+                audioSrc.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
+            }
         }
     }
 }

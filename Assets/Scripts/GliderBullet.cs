@@ -31,7 +31,6 @@ public class GliderBullet : MonoBehaviour
         transform.rotation = Quaternion.Euler(0, 0, angle);
         //transform.rotation = Quaternion.Euler(0, 0, direction);
         audioSource.PlayOneShot(bulletSound, 1f);
-        UpdateDrawPos(2f, 2f);
         player.trigger = true;
         player.alarm4 = 60;
         circleRenderer.positionCount = circleSegments;
@@ -49,8 +48,6 @@ public class GliderBullet : MonoBehaviour
         {
             Dissolve();
         }
-
-        UpdateDrawPos(2f, 1.2f);
     }
 
     void Move()
@@ -79,15 +76,12 @@ public class GliderBullet : MonoBehaviour
         }
     }
 
-    void UpdateDrawPos(float xLen, float yLen)
+    void UpdateDrawPos(float distance)
     {
-        float xOff = Mathf.Floor(xLen * Mathf.Cos(direction * Mathf.Deg2Rad));
-        float yOff = Mathf.Floor(yLen * Mathf.Sin(direction * Mathf.Deg2Rad));
-
-        drawPos = new Vector2(
-            transform.position.x + xOff,
-            transform.position.y - yOff
-        );
+        float rad = direction * Mathf.Deg2Rad;
+        float xOff = distance * Mathf.Cos(rad) * transform.localScale.x;
+        float yOff = distance * Mathf.Sin(rad) * transform.localScale.x;
+        drawPos = new Vector2(transform.position.x + xOff, transform.position.y - yOff);
     }
 
     void LateUpdate()
@@ -97,7 +91,7 @@ public class GliderBullet : MonoBehaviour
         if (phase == 0)
             c.a = 1f;
         else
-            c.a = alpha;
+            c.a = 0f;
 
         spriteRenderer.color = c;
     }
@@ -137,10 +131,12 @@ public class GliderBullet : MonoBehaviour
             AudioClip[] clips = { player.sndHurt, player.sndHurt2, player.sndHurt3 };
             player.audioSrc.PlayOneShot(clips[Random.Range(0, clips.Length)]);
 
+            UpdateDrawPos(1f);
             phase = 1;
         }
         else if (other.CompareTag("Ground"))
         {
+            UpdateDrawPos(1f);
             phase = 1;
         }
     }
@@ -181,5 +177,4 @@ public class GliderBullet : MonoBehaviour
             circleRenderer.SetPosition(i, center + pos);
         }
     }
-
 }
