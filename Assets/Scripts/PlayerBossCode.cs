@@ -9,7 +9,7 @@ public class PlayerBossCode : MonoBehaviour
 
     void Update()
     {
-        if (myself.transform.position.y <= -0.655f && myself.pState != PlayerStep.PlayerState.quickzip && myself.pState != PlayerStep.PlayerState.death)
+        if (myself.transform.position.y <= -1.72f && myself.pState != PlayerStep.PlayerState.quickzip && myself.pState != PlayerStep.PlayerState.death)
         {
             if (myself.pState == PlayerStep.PlayerState.swing)
             {

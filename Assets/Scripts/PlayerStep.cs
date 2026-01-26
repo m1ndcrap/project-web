@@ -1137,6 +1137,7 @@ public class PlayerStep : MonoBehaviour
             case PlayerState.quickzip:
             {
                 swingEnd = false;
+                bool freezeRotation = false;
 
                 if (moveTarget.HasValue)
                 {
@@ -1152,7 +1153,7 @@ public class PlayerStep : MonoBehaviour
                     if (zipDir != Vector2.zero)
                     {
                         float angle = Mathf.Atan2(zipDir.y, zipDir.x) * Mathf.Rad2Deg;
-                        transform.rotation = Quaternion.Euler(0f, 0f, angle - 90);
+                        if (!freezeRotation) {transform.rotation = Quaternion.Euler(0f, 0f, angle - 90);}
                     }
 
                     rb.velocity = zipDir * 4f;
@@ -1194,18 +1195,21 @@ public class PlayerStep : MonoBehaviour
                     if (nearWall && dirOff > 0)
                     {
                         hasTurn = false;
+                        freezeRotation = true;
                         transform.rotation = Quaternion.Euler(0f, 0f, 0f);
                         StartCoroutine(RotateAroundCorner(new Vector3(-0.1f, 0.1f, 0), 90f, 4));
                     }
                     else if (nearWall && dirOff < 0)
                     {
                         hasTurn = false;
+                        freezeRotation = true;
                         transform.rotation = Quaternion.Euler(0f, 0f, 0f);
                         StartCoroutine(RotateAroundCorner(new Vector3(0.1f, 0.1f, 0), -90f, 2));
                     }
                     else if (nearCeiling)
                     {
                         hasTurn = false;
+                        freezeRotation = true;
                         transform.rotation = Quaternion.Euler(0f, 0f, 0f);
                         StartCoroutine(RotateAroundCorner(new Vector3(0f, 0.15f, 0), 180f, 3));
                     }

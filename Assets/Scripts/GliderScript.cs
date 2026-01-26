@@ -207,14 +207,14 @@ public class GliderScript : MonoBehaviour
 
     void Zooming()
     {
-        float amount = (goblin.gState == GoblinStep.GoblinState.on_glider || goblin.gState == GoblinStep.GoblinState.on_glider_hit) ? 0.44f : 0.15f;
+        float amount = (goblin.gState == GoblinStep.GoblinState.on_glider) ? 0.44f : 0.15f;
 
         if (!moving)
         {
             if (transform.position.x > screenLeft && transform.position.x < screenRight)
             {
                 float target = Mathf.Abs(transform.position.x - screenRight) < Mathf.Abs(transform.position.x - screenLeft) ? screenRight : screenLeft;
-                transform.position = Vector2.MoveTowards(transform.position, new Vector2(target, transform.position.y), 0.1f * Time.deltaTime * 60f);
+                transform.position = Vector2.MoveTowards(transform.position, new Vector2(target, transform.position.y), 0.075f * Time.deltaTime * 60f);
             }
             else
             {
@@ -258,7 +258,7 @@ public class GliderScript : MonoBehaviour
 
     void AirFight()
     {
-        if (goblin.gState != GoblinStep.GoblinState.on_glider && goblin.gState != GoblinStep.GoblinState.air_hit && goblin.gState != GoblinStep.GoblinState.on_glider_hit && goblin.health > 0)
+        if (goblin.gState != GoblinStep.GoblinState.on_glider && goblin.health > 0)
             goblin.gState = GoblinStep.GoblinState.on_glider;
 
         sr.flipX = transform.position.x > player.transform.position.x;

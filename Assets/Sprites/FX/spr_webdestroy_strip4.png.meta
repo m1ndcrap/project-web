@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 2970e4f4e3dd91244b9ee72f1e77ffc5
+guid: 3ecebdab1018b8449925e6c5f7b4a87d
 TextureImporter:
   internalIDToNameTable: []
   externalObjects: {}
@@ -69,7 +69,7 @@ TextureImporter:
   platformSettings:
   - serializedVersion: 3
     buildTarget: DefaultTexturePlatform
-    maxTextureSize: 512
+    maxTextureSize: 64
     resizeAlgorithm: 0
     textureFormat: -1
     textureCompression: 1
@@ -97,85 +97,85 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: spr_spider_sense_strip4_0
+      name: spr_webdestroy_strip4_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 72
-        height: 43
-      alignment: 9
-      pivot: {x: 0.5, y: 0.30232558}
+        width: 12
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 1d8b40a9995567d48bdcc49d9eda502c
-      internalID: -1246739595
+      spriteID: 5dadaf2c918fd794694a74d47b784459
+      internalID: -1753637743
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: spr_spider_sense_strip4_1
+      name: spr_webdestroy_strip4_1
       rect:
         serializedVersion: 2
-        x: 72
+        x: 12
         y: 0
-        width: 72
-        height: 43
-      alignment: 9
-      pivot: {x: 0.5, y: 0.30232558}
+        width: 12
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 0d95d12708c2005489d4de4d0e392ffd
-      internalID: 483172936
+      spriteID: d6a24efa6c1063d4392a53473c29a37a
+      internalID: 1227005587
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: spr_spider_sense_strip4_2
+      name: spr_webdestroy_strip4_2
       rect:
         serializedVersion: 2
-        x: 144
+        x: 24
         y: 0
-        width: 72
-        height: 43
-      alignment: 9
-      pivot: {x: 0.5, y: 0.30232558}
+        width: 12
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 3d092c0540fbb4545b6b10e3a4d4b32f
-      internalID: -298539664
+      spriteID: 62becd1f10d931f49b60e700314639e0
+      internalID: 322477121
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: spr_spider_sense_strip4_3
+      name: spr_webdestroy_strip4_3
       rect:
         serializedVersion: 2
-        x: 216
+        x: 36
         y: 0
-        width: 72
-        height: 43
-      alignment: 9
-      pivot: {x: 0.5, y: 0.30232558}
+        width: 12
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: feea325aea0f4fd4e8203ef48fccfe03
-      internalID: -2128587773
+      spriteID: 60e395d455011c943867a0c4e61f74e4
+      internalID: 2071773634
       vertices: []
       indices: 
       edges: []
@@ -191,10 +191,10 @@ TextureImporter:
     weights: []
     secondaryTextures: []
     nameFileIdTable:
-      spr_spider_sense_strip4_0: -1246739595
-      spr_spider_sense_strip4_1: 483172936
-      spr_spider_sense_strip4_2: -298539664
-      spr_spider_sense_strip4_3: -2128587773
+      spr_webdestroy_strip4_0: -1753637743
+      spr_webdestroy_strip4_1: 1227005587
+      spr_webdestroy_strip4_2: 322477121
+      spr_webdestroy_strip4_3: 2071773634
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

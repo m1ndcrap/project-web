@@ -17,24 +17,31 @@ public class ShootScript : MonoBehaviour
     [SerializeField] private AudioClip sndWebDestroy;
     [SerializeField] private PlayerStep player;
 
+    private Animator anim;
+
     private void Start()
     {
         rb = GetComponent<Rigidbody2D>();
+        anim = GetComponent<Animator>();
         player = FindObjectOfType<PlayerStep>();
         Destroy(gameObject, lifeTime);
     }
 
     private void FixedUpdate()
     {
-        rb.velocity = transform.right * speed; 
+        AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
+        if (!stateInfo.IsName("WebDestroy")) { rb.velocity = transform.right * speed; } else { rb.velocity = Vector2.zero; }
+        if (stateInfo.IsName("WebDestroy") && stateInfo.normalizedTime >= 0.8f) { Destroy(gameObject); }
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
+        AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
+
         if (other.CompareTag("Ground") || other.CompareTag("CarSolid"))
         {
             audioSrc.PlayOneShot(sndWebDestroy);
-            Destroy(gameObject);
+            if (!stateInfo.IsName("WebDestroy")) { anim.Play("WebDestroy"); }
         }
         
         if (other.CompareTag("Enemy"))
@@ -46,7 +53,7 @@ public class ShootScript : MonoBehaviour
             enemy.alarm5 = 240;
             audioSrc.PlayOneShot(sndWebDestroy);
             player.alarm3 = 300;
-            Destroy(gameObject);
+            if (!stateInfo.IsName("WebDestroy")) { anim.Play("WebDestroy"); }
         }
 
         if (other.CompareTag("Goblin"))
@@ -60,7 +67,7 @@ public class ShootScript : MonoBehaviour
 
                 if (goblin.gState != GoblinStep.GoblinState.on_glider)
                 {
-                    goblin.rb.velocity = new Vector2(dir * 1f, 0f);
+                    goblin.rb.velocity = new Vector2(0f, 0f);
                     goblin.anim.speed = 1;
                     goblin.gState = GoblinStep.GoblinState.getting_hit;
 
@@ -68,16 +75,16 @@ public class ShootScript : MonoBehaviour
                     int hitIndex = Random.Range(0, 2); // 0 or 1
 
                     if (hitIndex == 0)
-                        mstate = GoblinStep.MovementState.hurt1;
+                        mstate = GoblinStep.MovementState.breakweb1;
                     else
-                        mstate = GoblinStep.MovementState.hurt2;
+                        mstate = GoblinStep.MovementState.breakweb1;
 
                     goblin.anim.SetInteger("mstate", (int)mstate);
                 }
             }
 
             audioSrc.PlayOneShot(sndWebDestroy);
-            Destroy(gameObject);
+            if (!stateInfo.IsName("WebDestroy")) { anim.Play("WebDestroy"); }
         }
     }
 }
