@@ -1,11 +1,13 @@
 using System;
 using System.Collections;
+using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
 using UnityEngine.XR;
 using static GliderScript;
+using static RobotStep;
 
 public class GoblinStep : MonoBehaviour
 {
@@ -49,14 +51,14 @@ public class GoblinStep : MonoBehaviour
 
     // Alarms
     [SerializeField] public int alarm4 = 0;
-    public int alarm5 = 0;
     [SerializeField] private float distanceFromPlayer = 0f;
     public int alarm7 = 0;
     [SerializeField] private int alarm11 = 0;
     [SerializeField] private bool startAlarm11 = false;
     private int alarm12 = 0;
     [SerializeField] private int alarm6 = 300;
-    //private bool startAlarm6 = false;
+    private bool startAlarm2 = false;
+    private int alarm2 = 0;
 
     // Combat
     private Material outline;
@@ -70,8 +72,8 @@ public class GoblinStep : MonoBehaviour
     private bool blockOnGlider = false;
 
     // health bar
-    public int health = 300;
-    private int maxHealth = 300;
+    [SerializeField] public int health = 300;
+    [SerializeField] private int maxHealth = 300;
     BossHealth healthbar;
 
     [SerializeField] public bool blocking = false;
@@ -158,6 +160,25 @@ public class GoblinStep : MonoBehaviour
             alarm6 = 400;
         }
 
+        if (startAlarm2)
+        {
+            if (alarm2 > 0)
+            {
+                alarm2 -= 1;
+            }
+            else
+            {
+                if (gState == GoblinState.death)
+                {
+                    #if UNITY_EDITOR
+                        EditorApplication.isPlaying = false;
+                    #else
+                        Application.Quit();
+                    #endif
+                }
+            }
+        }
+
         if (alarm7 > 0)
             alarm7 -= 1;
         else
@@ -202,7 +223,6 @@ public class GoblinStep : MonoBehaviour
             {
                 if (glider.state == GState.Throwing || gState == GoblinState.engaged || glider.state == GState.AirFight) { if (throwing) { threw = true; } }
                 if (player.isEnemyAttacking) { player.isEnemyAttacking = false; }
-                //if state == ggState.death { game_restart(); }
                 startAlarm11 = false;
             }
         }
@@ -407,6 +427,8 @@ public class GoblinStep : MonoBehaviour
 		        if (Math.Abs(transform.position.x - player.transform.position.x) < 0.572f) {dirX = 0;}
 		        if ((Math.Abs(transform.position.x - player.transform.position.x) > 0.572f) && transform.position.x < -10.27f) {dirX = 1;}
 		        if ((Math.Abs(transform.position.x - player.transform.position.x) > 0.572f) && transform.position.x > -1.27f) {dirX = -1;}
+                if (transform.position.x < -10.27f && transform.position.y < 3.6f) { transform.position = new Vector2(-9.79f, 4.44f); }
+                if (transform.position.x > -1.27f && transform.position.y < 3.6f) { transform.position = new Vector2(-1.73f, 4.44f); }
 	
 	            if (Vector3.Distance(player.transform.position, transform.position) >= 2f && canThrow)
 	            {
@@ -478,16 +500,10 @@ public class GoblinStep : MonoBehaviour
 		
 		            if ((stateInfo.normalizedTime >= 0.5f) && (stateInfo.normalizedTime <= 0.53f) && FindObjectsOfType<PumpkinProjectile>().Length == 0)
 		            {
-                        GameObject bomb = Instantiate(
-                            goblinBombPrefab,
-                            transform.position + Vector3.up * 0.5f,
-                            Quaternion.identity
-                        );
-
+                        GameObject bomb = Instantiate(goblinBombPrefab, transform.position + Vector3.up * 0.5f, Quaternion.identity);
                         int dirP = sprite.flipX ? -1 : 1;
                         bomb.GetComponent<PumpkinProjectile>().dir = dirP;
                         bomb.GetComponent<PumpkinProjectile>().airborne = false;
-
                         AudioClip[] clips = { sndGLaugh1, sndGLaugh2, sndGLaugh3 };
                         audioSrc.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
 		            }
@@ -545,6 +561,23 @@ public class GoblinStep : MonoBehaviour
 		        dirX = 0;
 		        canAttack = true;
                 if (stateInfo.IsName("Goblin_Block") && stateInfo.normalizedTime >= 1f) { gState = GoblinState.engaged; }
+            }
+            break;
+
+            case GoblinState.death:
+            {
+                Physics2D.IgnoreLayerCollision(LayerMask.NameToLayer("Enemy"), LayerMask.NameToLayer("Player"), true);
+
+                if (glider.state == GState.AirFight)
+                {
+                    Vector2 pos = glider.transform.position;
+                    transform.position = new Vector2(pos.x, pos.y + 0.54f);
+                }
+                else
+                {
+                    rb.gravityScale = 1;
+                    rb.velocity = Vector2.zero;
+                }
             }
             break;
         }
@@ -626,14 +659,30 @@ public class GoblinStep : MonoBehaviour
             if (rb.velocity.y < -0.1f) { mstate = MovementState.falling; }
         }
 
+        AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
+        float normalizedTime = stateInfo.normalizedTime % 1f;
+
         if (gState == GoblinState.death)
         {
             anim.speed = 1f;
             mstate = MovementState.death;
-        }
 
-        AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
-        float normalizedTime = stateInfo.normalizedTime % 1f;
+            if (normalizedTime >= 0.352f && normalizedTime <= 0.389f)
+            {
+                if (Grounded()) audioSrc.PlayOneShot(sndLand);
+            }
+
+            if (!startAlarm2)
+            {
+                alarm2 = 360;
+                startAlarm2 = true;
+            }
+
+            if (normalizedTime >= 0.99f)
+            {
+                anim.speed = 0f;
+            }
+        }
 
         if (mstate == MovementState.sprinting)
         {
@@ -658,20 +707,6 @@ public class GoblinStep : MonoBehaviour
         {
             hasPlayedStep1 = false;
             hasPlayedStep2 = false;
-        }
-
-        if (mstate == MovementState.death)
-        {
-            if (normalizedTime >= 0.352f && normalizedTime <= 0.389f)
-            {
-                if (Grounded()) audioSrc.PlayOneShot(sndLand);
-            }
-
-            if (normalizedTime == 1f)
-            {
-                anim.speed = 0f;
-                normalizedTime = 1f;
-            }
         }
 
         anim.SetInteger("mstate", (int)mstate);
@@ -754,13 +789,13 @@ public class GoblinStep : MonoBehaviour
                     if (health > 0)
                     {
                         if ((player.combo - 4) % 5 == 0)
-                            health -= 7;
+                            health -= 11;
                         else if (player.countering)
-                            health -= 3;
-                        else if (player.uppercut)
                             health -= 5;
+                        else if (player.uppercut)
+                            health -= 8;
                         else
-                            health -= 4;
+                            health -= 6;
 
                         healthbar.UpdateHealthBar(health, maxHealth);
                     }
@@ -815,13 +850,13 @@ public class GoblinStep : MonoBehaviour
                     if (health > 0)
                     {
                         if ((player.combo - 4) % 5 == 0)
-                            health -= 7;
+                            health -= 11;
                         else if (player.countering)
-                            health -= 3;
-                        else if (player.uppercut)
                             health -= 5;
+                        else if (player.uppercut)
+                            health -= 8;
                         else
-                            health -= 4;
+                            health -= 6;
 
                         healthbar.UpdateHealthBar(health, maxHealth);
                     }

@@ -136,7 +136,7 @@ public class PumpkinSpinner : MonoBehaviour
                 
                 player.anim.SetInteger("mstate", (int)mstate);
 
-                player.health -= 4;
+                player.health -= 2;
                 player.healthbar.UpdateHealthBar(player.health, player.maxHealth);
 
                 AudioClip[] clips = { player.sndHurt, player.sndHurt2, player.sndHurt3 };

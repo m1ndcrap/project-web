@@ -2138,7 +2138,7 @@ public class PlayerStep : MonoBehaviour
 
                 if (health > 0)
                 {
-                    health -= 3;
+                    health -= 4;
                     healthbar.UpdateHealthBar(health, maxHealth);
                 }
 

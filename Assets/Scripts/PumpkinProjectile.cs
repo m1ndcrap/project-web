@@ -139,7 +139,7 @@ public class PumpkinProjectile : MonoBehaviour
             PlayerStep.MovementState mstate = PlayerStep.MovementState.launched;
             player.anim.SetInteger("mstate", (int)mstate);
 
-            player.health -= 4;
+            player.health -= 3;
             player.healthbar.UpdateHealthBar(player.health, player.maxHealth);
 
             AudioClip[] clips = { player.sndHurt, player.sndHurt2, player.sndHurt3 };
