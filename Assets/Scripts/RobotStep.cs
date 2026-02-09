@@ -83,6 +83,12 @@ public class RobotStep : MonoBehaviour
     private bool lightningWasActive = false;
     private float hitCooldown = 0f;
 
+    // mission level specific vars
+    [SerializeField] private bool keyGiver = false;
+    [SerializeField] private string keyColor = "nothing";
+    private bool gaveKey = false;
+    [SerializeField] private GameObject keyPrefab;
+
     // Start is called before the first frame update
     void Start()
     {
@@ -581,6 +587,25 @@ public class RobotStep : MonoBehaviour
                 {
                     alarm6 = 240;
                     startAlarm6 = true;
+                }
+
+                if (keyGiver && !gaveKey)
+                {
+                    if (player.keys < 3)
+                    {
+                        player.keys += 1;
+                        GameObject key = Instantiate(keyPrefab, new Vector3(transform.position.x, transform.position.y, transform.position.z), Quaternion.identity);
+
+                        if (player.keys == 1)
+                            key.GetComponent<Keys>().keyIndex = 1;
+                        else if (player.keys == 2)
+                            key.GetComponent<Keys>().keyIndex = 2;
+                        else if (player.keys == 3)
+                            key.GetComponent<Keys>().keyIndex = 3;
+
+                        key.GetComponent<Keys>().keyColor = keyColor;
+                        gaveKey = true;
+                    }
                 }
             }
 

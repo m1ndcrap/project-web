@@ -913,12 +913,7 @@ public class GoblinStep : MonoBehaviour
 
     void SpawnSpinner(int dir, int speed)
     {
-        GameObject spinner = Instantiate(
-            goblinSpinnerPrefab,
-            transform.position + Vector3.up * 0.5f,
-            Quaternion.identity
-        );
-
+        GameObject spinner = Instantiate(goblinSpinnerPrefab, transform.position + Vector3.up * 0.5f, Quaternion.identity);
         var s = spinner.GetComponent<PumpkinSpinner>();
         s.dir = dir;
         s.airborne = true;

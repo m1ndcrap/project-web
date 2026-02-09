@@ -21,6 +21,10 @@ TagManager:
   - Web
   - Goblin
   - Glider
+  - KeyDoorSolid
+  - RedKeyDoor
+  - BlueKeyDoor
+  - YellowKeyDoor
   layers:
   - Default
   - TransparentFX

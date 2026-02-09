@@ -151,6 +151,10 @@ public class PlayerStep : MonoBehaviour
     private float lightningHitCooldown = 0f;
     private bool lightningWasActive = false;
     private float hitCooldown = 0f;
+    public int keys = 0;
+    public string keyColor1 = "nothing";
+    public string keyColor2 = "nothing";
+    public string keyColor3 = "nothing";
 
     // Start is called before the first frame update
     void Start()
@@ -292,6 +296,11 @@ public class PlayerStep : MonoBehaviour
 
         if (pState != PlayerState.quickzip && pState != PlayerState.swing)
             ReturnAllRopeSegmentsToPool();
+
+        if (keys < 0)
+            keys = 0;
+        else if (keys > 3)
+            keys = 3;
 
         switch (pState)
         {
@@ -2308,6 +2317,54 @@ public class PlayerStep : MonoBehaviour
         }
     }
 
+    private void RemoveKeyByColor(string colorToRemove)
+    {
+        Keys[] allKeys = FindObjectsOfType<Keys>();
+        Keys keyToRemove = null;
+        int removedKeyIndex = -1;
+
+        foreach (Keys key in allKeys)
+        {
+            if (key.keyColor == colorToRemove)
+            {
+                keyToRemove = key;
+                removedKeyIndex = key.keyIndex;
+                break;
+            }
+        }
+
+        if (keyToRemove != null)
+        {
+            keys -= 1 ;
+
+            if (removedKeyIndex == 1)
+            {
+                keyColor1 = keyColor2;
+                keyColor2 = keyColor3;
+                keyColor3 = "nothing";
+            }
+            else if (removedKeyIndex == 2)
+            {
+                keyColor2 = keyColor3;
+                keyColor3 = "nothing";
+            }
+            else if (removedKeyIndex == 3)
+            {
+                keyColor3 = "nothing";
+            }
+
+            foreach (Keys key in allKeys)
+            {
+                if (key != keyToRemove && key.keyIndex > removedKeyIndex)
+                {
+                    key.keyIndex -= 1;
+                }
+            }
+
+            Destroy(keyToRemove.gameObject);
+        }
+    }
+
     private void OnTriggerEnter2D(Collider2D collision)
     {
         if (pState != PlayerState.death && collision.gameObject.CompareTag("Health"))
@@ -2384,6 +2441,48 @@ public class PlayerStep : MonoBehaviour
                 rb.WakeUp();
                 rb.position = rb.position;
                 collision.gameObject.GetComponent<BreakableDoor>().phase = 1;
+            }
+        }
+
+        if (collision.gameObject.CompareTag("RedKeyDoor"))
+        {
+            rb.WakeUp();
+            AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
+
+            if (collision.gameObject.GetComponent<KeyDoors>().phase == 0 && keys > 0 && (keyColor1 == "red" || keyColor2 == "red" || keyColor3 == "red"))
+            {
+                rb.WakeUp();
+                rb.position = rb.position;
+                collision.gameObject.GetComponent<KeyDoors>().phase = 1;
+                RemoveKeyByColor("red");
+            }
+        }
+
+        if (collision.gameObject.CompareTag("BlueKeyDoor"))
+        {
+            rb.WakeUp();
+            AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
+
+            if (collision.gameObject.GetComponent<KeyDoors>().phase == 0 && keys > 0 && (keyColor1 == "blue" || keyColor2 == "blue" || keyColor3 == "blue"))
+            {
+                rb.WakeUp();
+                rb.position = rb.position;
+                collision.gameObject.GetComponent<KeyDoors>().phase = 1;
+                RemoveKeyByColor("blue");
+            }
+        }
+
+        if (collision.gameObject.CompareTag("YellowKeyDoor"))
+        {
+            rb.WakeUp();
+            AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
+
+            if (collision.gameObject.GetComponent<KeyDoors>().phase == 0 && keys > 0 && (keyColor1 == "yellow" || keyColor2 == "yellow" || keyColor3 == "yellow"))
+            {
+                rb.WakeUp();
+                rb.position = rb.position;
+                collision.gameObject.GetComponent<KeyDoors>().phase = 1;
+                RemoveKeyByColor("yellow");
             }
         }
 
