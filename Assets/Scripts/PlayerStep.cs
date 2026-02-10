@@ -2409,6 +2409,16 @@ public class PlayerStep : MonoBehaviour
                 audioSrc.PlayOneShot(sndWarning);
                 alarm4 = 60;
             }
+
+            if (collision.gameObject.GetComponent<ObjectiveTrigger>().missionType == 4 && collision.gameObject.GetComponent<ObjectiveTrigger>().missionObjective.GetComponent<ExplosiveScript>().phase == 0 && !collision.gameObject.GetComponent<ObjectiveTrigger>().active)
+            {
+                collision.gameObject.GetComponent<ObjectiveTrigger>().countdown = true;
+                collision.gameObject.GetComponent<ObjectiveTrigger>().active = true;
+                collision.gameObject.GetComponent<ObjectiveTrigger>().start = true;
+                trigger = true;
+                audioSrc.PlayOneShot(sndWarning);
+                alarm4 = 60;
+            }
         }
     }
 
@@ -2496,6 +2506,19 @@ public class PlayerStep : MonoBehaviour
                 rb.WakeUp();
                 rb.position = rb.position;
                 collision.gameObject.GetComponent<SwitchScript>().phase = 1;
+            }
+        }
+
+        if (collision.gameObject.CompareTag("Explosive"))
+        {
+            rb.WakeUp();
+            AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
+
+            if (collision.gameObject.GetComponent<ExplosiveScript>().phase == 0 && pState == PlayerState.dashenemy && ((stateInfo.IsName("Player_Air_Kick") && stateInfo.normalizedTime <= 0.86f) || (stateInfo.IsName("Player_Air_Punch") && stateInfo.normalizedTime <= 0.67f) || (stateInfo.IsName("Player_Kick1") && stateInfo.normalizedTime <= 0.65f) || (stateInfo.IsName("Player_Kick2") && stateInfo.normalizedTime <= 0.46f) || (stateInfo.IsName("Player_Punch1") && stateInfo.normalizedTime <= 0.52f) || (stateInfo.IsName("Player_Punch2") && stateInfo.normalizedTime <= 0.48f) || (stateInfo.IsName("Player_Punch3") && stateInfo.normalizedTime <= 0.25f) || (stateInfo.IsName("Player_Punch4") && stateInfo.normalizedTime <= 0.45f) || (stateInfo.IsName("Player_Uppercut") && stateInfo.normalizedTime <= 0.33f)))
+            {
+                rb.WakeUp();
+                rb.position = rb.position;
+                collision.gameObject.GetComponent<ExplosiveScript>().phase = 1;
             }
         }
 

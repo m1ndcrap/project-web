@@ -5,8 +5,8 @@ using UnityEngine.UI;
 
 public class ObjectiveTrigger : MonoBehaviour
 {
-    [SerializeField] public int missionType;   // 1 for hostage rescue, 2 for beat all enemies in area, 3 for chasing
-    [SerializeField] public GameObject missionObjective; // for hostage rescue
+    [SerializeField] public int missionType;   // 1 for hostage rescue, 2 for beat all enemies in area, 3 for chasing, 4 for destroying object
+    [SerializeField] public GameObject missionObjective; // for hostage rescue/destroying object
     [SerializeField] private List<GameObject> missionList; // for beating all enemies
     [SerializeField] private GameObject bgmController;
     [SerializeField] private List<GameObject> barriers;
@@ -146,7 +146,7 @@ public class ObjectiveTrigger : MonoBehaviour
 
             Vector2 objScreenPos = new Vector2();
 
-            if (missionType == 1)
+            if (missionType == 1 || missionType == 4)
                 objScreenPos = Camera.main.WorldToScreenPoint(missionObjective.transform.position);
             else if (missionType == 2 && closestEnemy != null)
                 objScreenPos = Camera.main.WorldToScreenPoint(closestEnemy.transform.position);
@@ -164,7 +164,7 @@ public class ObjectiveTrigger : MonoBehaviour
 
             if (missionType == 1)
                 uiIcons.sprite = sprTimerIcons[2];
-            else if (missionType == 2)
+            else if (missionType == 2 || missionType == 4)
                 uiIcons.sprite = sprTimerIcons[1];
             else
                 uiIcons.sprite = sprTimerIcons[0];
@@ -253,6 +253,27 @@ public class ObjectiveTrigger : MonoBehaviour
                 }
 
             }
+            else if (missionType == 4)
+            {
+                if (missionObjective.GetComponent<ExplosiveScript>().phase == 0)
+                {
+                    if (Vector3.Distance(player.transform.position, missionObjective.transform.position) < 2f)
+                    {
+                        found = true;
+                        uiArrow.canvasRenderer.SetAlpha(0);
+                        uiFound.canvasRenderer.SetAlpha(1);
+                    }
+                    else
+                    {
+                        found = false;
+                        indexF = 0;
+                        animateF = false;
+                        alarm2 = 0;
+                        uiArrow.canvasRenderer.SetAlpha(1);
+                        uiFound.canvasRenderer.SetAlpha(0);
+                    }
+                }
+            }
 
         }
 
@@ -295,6 +316,22 @@ public class ObjectiveTrigger : MonoBehaviour
                 if (SceneManager.GetActiveScene().name != "Test")
                     bgmController.GetComponent<BGMController>().intensity = 0;
                 
+                completed = true;
+                uiStart.canvasRenderer.SetAlpha(0);
+                uiArrow.canvasRenderer.SetAlpha(0);
+                uiFound.canvasRenderer.SetAlpha(0);
+                uiTimer.canvasRenderer.SetAlpha(0);
+                uiBG.canvasRenderer.SetAlpha(0);
+                uiIcons.canvasRenderer.SetAlpha(0);
+            }
+        }
+
+        if (missionType == 4 && !done)
+        {
+            if (missionObjective.GetComponent<ExplosiveScript>().phase != 0)
+            {
+                countdown = false;
+                bgmController.GetComponent<BGMController>().intensity = 0;
                 completed = true;
                 uiStart.canvasRenderer.SetAlpha(0);
                 uiArrow.canvasRenderer.SetAlpha(0);
