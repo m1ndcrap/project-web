@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
 public class ExplosiveScript : MonoBehaviour
 {
     public int phase = 0;
@@ -13,6 +12,11 @@ public class ExplosiveScript : MonoBehaviour
     private int alarm1 = 0;
     [SerializeField] private bool createAnotherTrigger = false;
     [SerializeField] private GameObject nextTrigger;
+    private GameObject explosion;
+    private SpriteRenderer explosionSpriteRenderer;
+    private Animator explosionAnimator;
+    [SerializeField] private Sprite explosionSprite;
+    [SerializeField] private RuntimeAnimatorController explosionAnimatorController;
 
     void Start()
     {
@@ -24,7 +28,6 @@ public class ExplosiveScript : MonoBehaviour
             nextTrigger.SetActive(false);
         }
     }
-
     void Update()
     {
         if (phase == 0) { anim.Play("ExplosiveActive"); }
@@ -48,7 +51,7 @@ public class ExplosiveScript : MonoBehaviour
                 {
                     nextTrigger.SetActive(true);
                     createAnotherTrigger = false;
-                }   
+                }
 
                 phase = 2;
             }
@@ -56,6 +59,36 @@ public class ExplosiveScript : MonoBehaviour
 
         AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
 
-        if (phase == 2) { anim.Play("ExplosiveInactive"); }
+        if (phase == 2)
+        {
+            explosion = new GameObject("Explosion");
+            explosion.transform.SetParent(transform);
+            explosion.transform.localPosition = Vector3.zero;
+            explosion.transform.localRotation = Quaternion.identity;
+            explosion.transform.localScale = new Vector3(1.15f, 1.15f, 1.15f);
+            explosionSpriteRenderer = explosion.AddComponent<SpriteRenderer>();
+            explosionSpriteRenderer.sprite = explosionSprite;
+            explosionSpriteRenderer.sortingOrder = 1;
+            explosionAnimator = explosion.AddComponent<Animator>();
+            explosionAnimator.runtimeAnimatorController = explosionAnimatorController;
+            phase = 3;
+        }
+
+        if (phase == 3)
+        {
+            anim.Play("ExplosiveInactive");
+
+            if (explosionAnimator != null)
+            {
+                AnimatorStateInfo explosionStateInfo = explosionAnimator.GetCurrentAnimatorStateInfo(0);
+                explosionAnimator.Play("Explosion");
+
+                if (explosionStateInfo.IsName("Explosion") && explosionStateInfo.normalizedTime >= 1f)
+                {
+                    Destroy(explosion);
+                    explosionAnimator = null;
+                }
+            }
+        }
     }
 }
