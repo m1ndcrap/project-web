@@ -50,12 +50,30 @@ public class ObjectiveTrigger : MonoBehaviour
     private int alarm1 = 0;
     private int alarm2 = 0;
     private int alarm3 = 0;
+    private int alarm4 = 0;
+    private int alarm5 = 0;
+    private bool startAlarm5 = false;
 
     private GameObject closestEnemy = null;
+
+    private int timerIndex = 0;
+    private bool animateTimer = true;
+    private bool timerActive = false;
+    private bool timerFailed = false;
+
+    private bool cameraPanning = false;
+    private Vector3 originalCameraPos;
+    private float panProgress = 0f;
+    private float panDuration = 1.5f;
+    private CameraController cameraController;
+
+    private Cinemachine.CinemachineVirtualCamera virtualCamera;
 
     void Start()
     {
         player = FindObjectOfType<PlayerStep>();
+        cameraController = Camera.main.GetComponent<CameraController>();
+        virtualCamera = FindObjectOfType<Cinemachine.CinemachineVirtualCamera>();
         uiStart.canvasRenderer.SetAlpha(0);
         uiArrow.canvasRenderer.SetAlpha(0);
         uiFound.canvasRenderer.SetAlpha(0);
@@ -135,6 +153,56 @@ public class ObjectiveTrigger : MonoBehaviour
             }
         }
 
+        if (alarm4 > 0)
+        {
+            alarm4 -= 1;
+        }
+        else
+        {
+            if (timerActive && !timerFailed)
+            {
+                if (timerIndex >= 31)
+                {
+                    if (missionType == 4 && missionObjective != null &&
+                        missionObjective.GetComponent<ExplosiveScript>().phase == 0)
+                    {
+                        Debug.Log("failed");
+                        timerFailed = true;
+                        timerActive = false;
+                        cameraPanning = true;
+                        panProgress = 0f;
+
+                        if (virtualCamera != null && missionObjective != null)
+                        {
+                            virtualCamera.Follow = missionObjective.transform;
+                        }
+                        else if (cameraController != null)
+                        {
+                            originalCameraPos = Camera.main.transform.position;
+                            cameraController.followPlayer = false;
+                        }
+                    }
+                }
+                else
+                {
+                    timerIndex++;
+                    animateTimer = true;
+                }
+            }
+        }
+
+        if (startAlarm5)
+        {
+            if (alarm5 > 0)
+            {
+                alarm5 -= 1;
+            }
+            else
+            {
+                SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+            }
+        }
+
         if (countdown)
         {
             uiBG.sprite = sprTimerBG;
@@ -173,6 +241,15 @@ public class ObjectiveTrigger : MonoBehaviour
 
             if (SceneManager.GetActiveScene().name != "Test")
                 bgmController.GetComponent<BGMController>().intensity = 1;
+
+            if (missionType == 4 && !timerActive && !timerFailed && missionObjective != null && missionObjective.GetComponent<ExplosiveScript>().phase == 0)
+            {
+                timerActive = true;
+                timerIndex = 0;
+                animateTimer = true;
+                uiTimer.rectTransform.anchoredPosition = Vector2.zero;
+                uiTimer.canvasRenderer.SetAlpha(1);
+            }
 
             if (missionType == 1)
             {
@@ -285,7 +362,7 @@ public class ObjectiveTrigger : MonoBehaviour
 
                 if (SceneManager.GetActiveScene().name != "Test")
                     bgmController.GetComponent<BGMController>().intensity = 0;
-                
+
                 completed = true;
                 uiStart.canvasRenderer.SetAlpha(0);
                 uiArrow.canvasRenderer.SetAlpha(0);
@@ -315,7 +392,7 @@ public class ObjectiveTrigger : MonoBehaviour
 
                 if (SceneManager.GetActiveScene().name != "Test")
                     bgmController.GetComponent<BGMController>().intensity = 0;
-                
+
                 completed = true;
                 uiStart.canvasRenderer.SetAlpha(0);
                 uiArrow.canvasRenderer.SetAlpha(0);
@@ -333,6 +410,7 @@ public class ObjectiveTrigger : MonoBehaviour
                 countdown = false;
                 bgmController.GetComponent<BGMController>().intensity = 0;
                 completed = true;
+                timerActive = false;
                 uiStart.canvasRenderer.SetAlpha(0);
                 uiArrow.canvasRenderer.SetAlpha(0);
                 uiFound.canvasRenderer.SetAlpha(0);
@@ -366,6 +444,41 @@ public class ObjectiveTrigger : MonoBehaviour
             {
                 alarm2 = 2;
                 animateF = false;
+            }
+        }
+
+        if (missionType == 4 && timerActive && !timerFailed && timerIndex < sprTimer.Length)
+        {
+            uiTimer.canvasRenderer.SetAlpha(1);
+            uiTimer.sprite = sprTimer[timerIndex];
+            uiTimer.rectTransform.anchoredPosition = Vector2.zero;
+
+            if (animateTimer)
+            {
+                alarm4 = 40;
+                animateTimer = false;
+            }
+        }
+
+        if (timerFailed)
+        {
+            uiTimer.canvasRenderer.SetAlpha(0);
+        }
+
+        if (cameraPanning && missionType == 4 && missionObjective != null)
+        {
+            panProgress += Time.deltaTime / panDuration;
+
+            if (panProgress >= 1f)
+            {
+                cameraPanning = false;
+                if (!startAlarm5) { startAlarm5 = true; alarm5 = 300; }
+            }
+            else if (virtualCamera == null && cameraController != null)
+            {
+                Vector3 targetPos = new Vector3(missionObjective.transform.position.x, missionObjective.transform.position.y, originalCameraPos.z);
+                float easedProgress = Mathf.SmoothStep(0f, 1f, panProgress);
+                Camera.main.transform.position = Vector3.Lerp(originalCameraPos, targetPos, easedProgress);
             }
         }
 
