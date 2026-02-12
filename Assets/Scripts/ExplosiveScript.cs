@@ -17,6 +17,8 @@ public class ExplosiveScript : MonoBehaviour
     private Animator explosionAnimator;
     [SerializeField] private Sprite explosionSprite;
     [SerializeField] private RuntimeAnimatorController explosionAnimatorController;
+    public bool bigExplosion = false;
+    private float explosionScaleMultiplier = 8f;
 
     void Start()
     {
@@ -88,6 +90,53 @@ public class ExplosiveScript : MonoBehaviour
                     Destroy(explosion);
                     explosionAnimator = null;
                 }
+            }
+        }
+
+        if (bigExplosion)
+            phase = 4;
+
+        if (phase == 4)
+        {
+            if (explosion == null)
+            {
+                explosion = new GameObject("Explosion");
+                explosion.transform.SetParent(transform);
+                explosion.transform.localPosition = Vector3.zero;
+                explosion.transform.localRotation = Quaternion.identity;
+                explosion.transform.localScale = Vector3.one;
+                explosionSpriteRenderer = explosion.AddComponent<SpriteRenderer>();
+                explosionSpriteRenderer.sprite = explosionSprite;
+                explosionSpriteRenderer.sortingLayerName = "Default";
+                explosionSpriteRenderer.sortingOrder = 21;
+                explosionAnimator = explosion.AddComponent<Animator>();
+                explosionAnimator.runtimeAnimatorController = explosionAnimatorController;
+            }
+
+            if (explosionAnimator != null)
+            {
+                AnimatorStateInfo explosionStateInfo = explosionAnimator.GetCurrentAnimatorStateInfo(0);
+                explosionAnimator.Play("ExplosionBig");
+                float normalizedTime = stateInfo.normalizedTime;
+                float scaleProgress = Mathf.Clamp01(normalizedTime);
+                float currentScale = 1f + (explosionScaleMultiplier * scaleProgress);
+                explosion.transform.localScale = Vector3.one * currentScale;
+
+                //// Optional: Track frame changes for more granular control
+                //AnimatorClipInfo[] clipInfo = explosionAnimator.GetCurrentAnimatorClipInfo(0);
+                //if (clipInfo.Length > 0)
+                //{
+                //    float clipLength = clipInfo[0].clip.length;
+                //    float frameRate = clipInfo[0].clip.frameRate;
+                //    int currentFrame = Mathf.FloorToInt(normalizedTime * clipLength * frameRate);
+
+                //    if (currentFrame != lastAnimationFrame)
+                //    {
+                //        lastAnimationFrame = currentFrame;
+                //        // Scale increases with each frame
+                //        Debug.Log($"Explosion frame: {currentFrame}, Scale: {currentScale}");
+                //    }
+                //}
             }
         }
     }

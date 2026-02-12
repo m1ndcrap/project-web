@@ -52,6 +52,7 @@ public class ObjectiveTrigger : MonoBehaviour
     private int alarm3 = 0;
     private int alarm4 = 0;
     private int alarm5 = 0;
+    private int alarm6 = 0;
     private bool startAlarm5 = false;
 
     private GameObject closestEnemy = null;
@@ -200,6 +201,15 @@ public class ObjectiveTrigger : MonoBehaviour
             else
             {
                 SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+            }
+
+            if (alarm6 > 0)
+            {
+                alarm6 -= 1;
+            }
+            else
+            {
+                missionObjective.GetComponent<ExplosiveScript>().bigExplosion = true;
             }
         }
 
@@ -405,7 +415,7 @@ public class ObjectiveTrigger : MonoBehaviour
 
         if (missionType == 4 && !done)
         {
-            if (missionObjective.GetComponent<ExplosiveScript>().phase != 0)
+            if (missionObjective.GetComponent<ExplosiveScript>().phase != 0 && missionObjective.GetComponent<ExplosiveScript>().phase != 4)
             {
                 countdown = false;
                 bgmController.GetComponent<BGMController>().intensity = 0;
@@ -472,7 +482,7 @@ public class ObjectiveTrigger : MonoBehaviour
             if (panProgress >= 1f)
             {
                 cameraPanning = false;
-                if (!startAlarm5) { startAlarm5 = true; alarm5 = 300; }
+                if (!startAlarm5) { startAlarm5 = true; alarm5 = 300; alarm6 = 200; }
             }
             else if (virtualCamera == null && cameraController != null)
             {
