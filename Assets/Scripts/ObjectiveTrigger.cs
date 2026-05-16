@@ -33,7 +33,7 @@ public class ObjectiveTrigger : MonoBehaviour
     public bool start = false;
     private bool found = false;
     private bool completed = false;
-    private bool done = false;
+    public bool done = false;
     public bool active = false;
 
     private int indexS = 0;
@@ -69,6 +69,10 @@ public class ObjectiveTrigger : MonoBehaviour
     private CameraController cameraController;
 
     private Cinemachine.CinemachineVirtualCamera virtualCamera;
+
+    [SerializeField] private ShockerStep chaseTarget;
+    [SerializeField] private GameObject chaseTriggerPrefab;
+    public int makeNew = 0; // 0 = no spawn, 1 or 3 = spawn next trigger at preset position
 
     void Start()
     {
@@ -228,6 +232,8 @@ public class ObjectiveTrigger : MonoBehaviour
                 objScreenPos = Camera.main.WorldToScreenPoint(missionObjective.transform.position);
             else if (missionType == 2 && closestEnemy != null)
                 objScreenPos = Camera.main.WorldToScreenPoint(closestEnemy.transform.position);
+            else if (missionType == 3)
+                objScreenPos = Camera.main.WorldToScreenPoint(chaseTarget.transform.position);
 
             Vector2 objLocalPos;
             RectTransformUtility.ScreenPointToLocalPointInRectangle(uiArrow.rectTransform.parent as RectTransform, objScreenPos, null, out objLocalPos);
@@ -253,6 +259,15 @@ public class ObjectiveTrigger : MonoBehaviour
                 bgmController.GetComponent<BGMController>().intensity = 1;
 
             if (missionType == 4 && !timerActive && !timerFailed && missionObjective != null && missionObjective.GetComponent<ExplosiveScript>().phase == 0)
+            {
+                timerActive = true;
+                timerIndex = 0;
+                animateTimer = true;
+                uiTimer.rectTransform.anchoredPosition = Vector2.zero;
+                uiTimer.canvasRenderer.SetAlpha(1);
+            }
+
+            if (missionType == 3 && !timerActive && !timerFailed)
             {
                 timerActive = true;
                 timerIndex = 0;
@@ -340,6 +355,15 @@ public class ObjectiveTrigger : MonoBehaviour
                 }
 
             }
+            else if (missionType == 3)
+            {
+                found = false;
+                indexF = 0;
+                animateF = false;
+                alarm2 = 0;
+                uiArrow.canvasRenderer.SetAlpha(1);
+                uiFound.canvasRenderer.SetAlpha(0);
+            }
             else if (missionType == 4)
             {
                 if (missionObjective.GetComponent<ExplosiveScript>().phase == 0)
@@ -404,6 +428,23 @@ public class ObjectiveTrigger : MonoBehaviour
                     bgmController.GetComponent<BGMController>().intensity = 0;
 
                 completed = true;
+                uiStart.canvasRenderer.SetAlpha(0);
+                uiArrow.canvasRenderer.SetAlpha(0);
+                uiFound.canvasRenderer.SetAlpha(0);
+                uiTimer.canvasRenderer.SetAlpha(0);
+                uiBG.canvasRenderer.SetAlpha(0);
+                uiIcons.canvasRenderer.SetAlpha(0);
+            }
+        }
+
+        if (missionType == 3 && !done)
+        {
+            if (chaseTarget.GetComponent<ShockerStep>().sState != ShockerStep.ShockerState.chase)
+            {
+                countdown = false;
+                bgmController.GetComponent<BGMController>().intensity = 0;
+                completed = true;
+                timerActive = false;
                 uiStart.canvasRenderer.SetAlpha(0);
                 uiArrow.canvasRenderer.SetAlpha(0);
                 uiFound.canvasRenderer.SetAlpha(0);

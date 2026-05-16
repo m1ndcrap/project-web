@@ -26,6 +26,7 @@ TagManager:
   - BlueKeyDoor
   - YellowKeyDoor
   - Explosive
+  - Shocker
   layers:
   - Default
   - TransparentFX

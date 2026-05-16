@@ -124,6 +124,7 @@ public class PlayerStep : MonoBehaviour
     private float dash_spd = 0f;
     public UnityEvent<RobotStep> OnHit;
     public UnityEvent<GoblinStep> OnHitG;
+    public UnityEvent<ShockerStep> OnHitS;
     [SerializeField] private bool waitingToHit = false;
     [SerializeField] private GameObject hitParticlePrefab;
     [SerializeField] private GameObject hurtParticlePrefab;
@@ -2162,6 +2163,65 @@ public class PlayerStep : MonoBehaviour
         }
     }
 
+    public void DamageShocker(ShockerStep target)
+    {
+        if (pState != PlayerState.death)
+        {
+            if (!countering)
+            {
+                float dir = 0;
+
+                if (!target.sprite.flipX)
+                {
+                    dir = 1f;
+                    dirX = -1f;
+                }
+                else
+                {
+                    dir = -1f;
+                    dirX = 1f;
+                }
+
+                rb.velocity = new Vector2(dir, 0f);
+                anim.speed = 1f;
+                combo = 0;
+                pState = PlayerState.hurt;
+                MovementState mstate;
+
+                int hitIndex = UnityEngine.Random.Range(0, 2);
+
+                if (hitIndex == 0)
+                    mstate = MovementState.hurt1;
+                else
+                    mstate = MovementState.hurt2;
+
+                AudioClip[] clips2 = { sndQuickHit, sndQuickHit2 };
+                int index2 = UnityEngine.Random.Range(0, clips2.Length);
+                if (index2 < clips2.Length) { audioSrc.PlayOneShot(clips2[index2]); }
+
+                anim.SetInteger("mstate", (int)mstate);
+
+                Vector2 hitPoint = target.transform.position;
+                enemyHitSpawn = target.transform.position;
+                SpawnHurtEffect(hitPoint);
+
+                if (health > 0)
+                {
+                    health -= 4;
+                    healthbar.UpdateHealthBar(health, maxHealth);
+                }
+
+                AudioClip[] clips = { sndHurt, sndHurt2, sndHurt3 };
+                int index = UnityEngine.Random.Range(0, clips.Length);
+                if (index < clips.Length) { audioSrc.PlayOneShot(clips[index]); }
+            }
+            else
+            {
+                target.OnPlayerHit(target);
+            }
+        }
+    }
+
     private void Attacking(GameObject target)
     {
         Rigidbody2D rb_target = target.GetComponent<Rigidbody2D>();
@@ -2401,6 +2461,16 @@ public class PlayerStep : MonoBehaviour
             }
 
             if (collision.gameObject.GetComponent<ObjectiveTrigger>().missionType == 2 && !collision.gameObject.GetComponent<ObjectiveTrigger>().active)
+            {
+                collision.gameObject.GetComponent<ObjectiveTrigger>().countdown = true;
+                collision.gameObject.GetComponent<ObjectiveTrigger>().active = true;
+                collision.gameObject.GetComponent<ObjectiveTrigger>().start = true;
+                trigger = true;
+                audioSrc.PlayOneShot(sndWarning);
+                alarm4 = 60;
+            }
+
+            if (collision.gameObject.GetComponent<ObjectiveTrigger>().missionType == 3 && !collision.gameObject.GetComponent<ObjectiveTrigger>().active)
             {
                 collision.gameObject.GetComponent<ObjectiveTrigger>().countdown = true;
                 collision.gameObject.GetComponent<ObjectiveTrigger>().active = true;
