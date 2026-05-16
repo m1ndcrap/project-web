@@ -71,8 +71,7 @@ public class ObjectiveTrigger : MonoBehaviour
     private Cinemachine.CinemachineVirtualCamera virtualCamera;
 
     [SerializeField] private ShockerStep chaseTarget;
-    [SerializeField] private GameObject chaseTriggerPrefab;
-    public int makeNew = 0; // 0 = no spawn, 1 or 3 = spawn next trigger at preset position
+    public bool chasing = true;
 
     void Start()
     {
@@ -357,12 +356,21 @@ public class ObjectiveTrigger : MonoBehaviour
             }
             else if (missionType == 3)
             {
-                found = false;
-                indexF = 0;
-                animateF = false;
-                alarm2 = 0;
-                uiArrow.canvasRenderer.SetAlpha(1);
-                uiFound.canvasRenderer.SetAlpha(0);
+                if (Vector2.Distance(chaseTarget.transform.position, player.transform.position) < 4.8f)
+                {
+                    found = true;
+                    uiArrow.canvasRenderer.SetAlpha(0);
+                    uiFound.canvasRenderer.SetAlpha(1);
+                }
+                else
+                {
+                    found = false;
+                    indexF = 0;
+                    animateF = false;
+                    alarm2 = 0;
+                    uiArrow.canvasRenderer.SetAlpha(1);
+                    uiFound.canvasRenderer.SetAlpha(0);
+                }
             }
             else if (missionType == 4)
             {
@@ -439,7 +447,7 @@ public class ObjectiveTrigger : MonoBehaviour
 
         if (missionType == 3 && !done)
         {
-            if (chaseTarget.GetComponent<ShockerStep>().sState != ShockerStep.ShockerState.chase)
+            if ((chaseTarget.GetComponent<ShockerStep>().sState != ShockerStep.ShockerState.chase) || !chasing)
             {
                 countdown = false;
                 bgmController.GetComponent<BGMController>().intensity = 0;
@@ -498,7 +506,7 @@ public class ObjectiveTrigger : MonoBehaviour
             }
         }
 
-        if (missionType == 4 && timerActive && !timerFailed && timerIndex < sprTimer.Length)
+        if ((missionType == 4 || missionType == 3) && timerActive && !timerFailed && timerIndex < sprTimer.Length)
         {
             uiTimer.canvasRenderer.SetAlpha(1);
             uiTimer.sprite = sprTimer[timerIndex];
