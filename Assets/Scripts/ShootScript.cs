@@ -3,6 +3,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.U2D;
 using static RobotStep;
+using static ShockerStep;
 using static UnityEditorInternal.VersionControl.ListControl;
 
 public class ShootScript : MonoBehaviour
@@ -84,6 +85,18 @@ public class ShootScript : MonoBehaviour
                 }
             }
 
+            audioSrc.PlayOneShot(sndWebDestroy);
+            if (!stateInfo.IsName("WebDestroy")) { anim.Play("WebDestroy"); }
+        }
+
+        if(other.CompareTag("Shocker"))
+        {
+            ShockerStep shocker = other.GetComponent<ShockerStep>();
+            GameObject shockwave = Instantiate(shocker.shockwavePrefab, shocker.transform.position, Quaternion.identity);
+            shockwave.GetComponent<Shockwave>().type = 0;
+            shocker.audioSrc.PlayOneShot(shocker.sndShockwaveBlast);
+            player.trigger = true;
+            player.alarm4 = 60;
             audioSrc.PlayOneShot(sndWebDestroy);
             if (!stateInfo.IsName("WebDestroy")) { anim.Play("WebDestroy"); }
         }

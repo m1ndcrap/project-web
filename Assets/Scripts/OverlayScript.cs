@@ -7,7 +7,11 @@ public class OverlayScript : MonoBehaviour
     [SerializeField] private float fadeMax = 0f;
     private float fadeSpeed = 0.25f;
 
-    void Start() { sr = GetComponent<SpriteRenderer>(); fadeSpeed = fadeMax / 4; }
+    void Start()
+    {
+        sr = GetComponent<SpriteRenderer>();
+        if (fadeMax != 0f) fadeSpeed = fadeMax / 4;
+    }
 
     void Update()
     {
