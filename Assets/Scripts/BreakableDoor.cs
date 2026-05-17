@@ -11,6 +11,8 @@ public class BreakableDoor : MonoBehaviour
     [SerializeField] private AudioClip sndBreak;
     [SerializeField] private GameObject doorEmpty;
     [SerializeField] private GameObject doorWall;
+    [SerializeField] private string normalAnim;
+    [SerializeField] private string breakAnim;
     private int alarm1 = 0;
 
     void Start()
@@ -21,7 +23,7 @@ public class BreakableDoor : MonoBehaviour
 
     void Update()
     {
-        if (phase == 0) { anim.Play("DoorNormal"); }
+        if (phase == 0) { anim.Play(normalAnim); }
 
         if (phase == 1 && !destroyed)
         {
@@ -35,14 +37,14 @@ public class BreakableDoor : MonoBehaviour
         {
             if (phase == 1)
             {
-                anim.Play("DoorBreak");
+                anim.Play(breakAnim);
                 audioSrc.PlayOneShot(sndBreak);
                 phase = 2;
             }
         }
 
         AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
-        if (phase == 2 && stateInfo.IsName("DoorBreak") && stateInfo.normalizedTime >= 1f) { phase = 3; }
+        if (phase == 2 && stateInfo.IsName(breakAnim) && stateInfo.normalizedTime >= 1f) { phase = 3; }
 
         if (phase == 3)
         {

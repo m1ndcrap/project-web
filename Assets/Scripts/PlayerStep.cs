@@ -2764,6 +2764,49 @@ public class PlayerStep : MonoBehaviour
             audioSrc.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
         }
 
+        if (collision.gameObject.CompareTag("Hydrant"))
+        {
+            if (!collision.GetComponent<FireHydrant>().webbed)
+            {
+                if (pState == PlayerState.death) return;
+
+                rb.WakeUp();
+                rb.position = rb.position;
+
+                if (hitCooldown > 0f)
+                {
+                    hitCooldown -= Time.deltaTime;
+                    return;
+                }
+
+                hitCooldown = 0.15f;
+
+                float dir = sprite.flipX ? 1f : -1f;
+                float dirY = collision.transform.position.y > transform.position.y ? -0.7f : 1f;
+                rb.velocity = new Vector2(dir * 2f, 5f * dirY);
+                anim.speed = 1f;
+                combo = 0;
+
+                pState = PlayerState.hurt;
+                MovementState mstate = MovementState.launched;
+
+                AudioClip[] clips2 = { sndStrongHit, sndStrongHit2 };
+                audioSrc.PlayOneShot(clips2[UnityEngine.Random.Range(0, clips2.Length)]);
+
+                anim.SetInteger("mstate", (int)mstate);
+
+                Vector2 hitPoint = transform.position;
+                enemyHitSpawn = collision.transform.position;
+                SpawnHurtEffect(hitPoint);
+
+                health -= 8;
+                healthbar.UpdateHealthBar(health, maxHealth);
+
+                AudioClip[] clips = { sndHurt, sndHurt2, sndHurt3 };
+                audioSrc.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
+            }
+        }
+
         if (collision.gameObject.CompareTag("Glider"))
         {
             if (collision.gameObject.GetComponent<GliderScript>().state == GliderScript.GState.Zooming)

@@ -94,6 +94,8 @@ public class ShockerStep : MonoBehaviour
     private bool moving = false;
     private int move_dir = 1;
     [SerializeField] private GameObject bgmController;
+    [SerializeField] private GameObject barrier1;
+    [SerializeField] private GameObject barrier2;
 
     private string shootAnim = "Shocker_Shoot1";
     void Start()
@@ -120,6 +122,9 @@ public class ShockerStep : MonoBehaviour
             BoxCollider2D otherCollider = obj.GetComponent<BoxCollider2D>();
             if (otherCollider != null) Physics2D.IgnoreCollision(myCollider, otherCollider, true);
         }
+
+        barrier1.SetActive(false);
+        barrier2.SetActive(false);
     }
 
     void Update()
@@ -550,11 +555,14 @@ public class ShockerStep : MonoBehaviour
                             trigger.GetComponent<ObjectiveTrigger>().done = true;
                             chased = false;
                             bgmController.GetComponent<BGMController>().intensity = 2;
+                            barrier1.SetActive(true);
+                            barrier2.SetActive(true);
                             sState = ShockerState.engaged;
                         }
                     }
                 }
-            } break;
+            }
+            break;
 
             case ShockerState.engaged:
             {

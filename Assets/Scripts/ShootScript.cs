@@ -1,7 +1,8 @@
 using Unity.Burst.CompilerServices;
+using UnityEditor;
 using UnityEngine;
-using static RobotStep;
 using UnityEngine.U2D;
+using static RobotStep;
 using static UnityEditorInternal.VersionControl.ListControl;
 
 public class ShootScript : MonoBehaviour
@@ -13,11 +14,11 @@ public class ShootScript : MonoBehaviour
     [SerializeField] private float lifeTime = 3f;
 
     private Rigidbody2D rb;
-    [SerializeField] private AudioSource audioSrc;
-    [SerializeField] private AudioClip sndWebDestroy;
+    [SerializeField] public AudioSource audioSrc;
+    [SerializeField] public AudioClip sndWebDestroy;
     [SerializeField] private PlayerStep player;
 
-    private Animator anim;
+    public Animator anim;
 
     private void Start()
     {
