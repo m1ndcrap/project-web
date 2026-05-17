@@ -4,9 +4,10 @@ public class OverlayScript : MonoBehaviour
 {
     private SpriteRenderer sr;
     private bool fading = false;
+    [SerializeField] private float fadeMax = 0f;
     private float fadeSpeed = 0.25f;
 
-    void Start() { sr = GetComponent<SpriteRenderer>(); }
+    void Start() { sr = GetComponent<SpriteRenderer>(); fadeSpeed = fadeMax / 4; }
 
     void Update()
     {
@@ -16,9 +17,9 @@ public class OverlayScript : MonoBehaviour
             c.a -= Time.deltaTime / fadeSpeed;
             sr.color = c;
 
-            if (c.a <= 0f)
+            if (c.a <= fadeMax)
             {
-                c.a = 0f;
+                c.a = fadeMax;
                 sr.color = c;
             }
         }
