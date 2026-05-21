@@ -7,11 +7,14 @@ public class FireHydrant : MonoBehaviour
 {
     [SerializeField] public bool webbed = false;
     [SerializeField] public FireHydrant nearby;
+    private AudioSource audioSrc;
+    [SerializeField] private AudioClip sndHydrantLoop;
     private Animator anim;
 
     void Start()
     {
         anim = GetComponent<Animator>();
+        audioSrc = GetComponent<AudioSource>();
     }
 
     void Update()
@@ -26,6 +29,9 @@ public class FireHydrant : MonoBehaviour
             {
                 anim.Play("FireHydrantActive");
             }
+
+            if (!audioSrc.isPlaying)
+                audioSrc.PlayOneShot(sndHydrantLoop);
         }
     }
 

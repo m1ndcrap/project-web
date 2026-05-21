@@ -12,9 +12,9 @@ public class BGMController : MonoBehaviour
     private float mediumVol = 0f;
     private float intenseVol = 0f;
 
-    private float lightVolMax = 0.6f;
-    private float mediumVolMax = 0.65f;
-    private float intenseVolMax = 0.45f;
+    [SerializeField] private float lightVolMax = 0.6f;
+    [SerializeField] private float mediumVolMax = 0.65f;
+    [SerializeField] private float intenseVolMax = 0.45f;
 
     private void Start()
     {

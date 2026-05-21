@@ -12,6 +12,8 @@ public class KeyDoors : MonoBehaviour
     private int alarm1 = 0;
     [SerializeField] private string doorColor = "nothing";
     [SerializeField] private GameObject doorPair;
+    [SerializeField] private AudioSource audioSrc;
+    [SerializeField] private AudioClip sndDoorOpen;
     private bool matchedPair = false;
 
     void Start()
@@ -54,6 +56,8 @@ public class KeyDoors : MonoBehaviour
         {
             if (phase == 1)
             {
+                audioSrc.PlayOneShot(sndDoorOpen);
+
                 switch (doorColor)
                 {
                     case "red":

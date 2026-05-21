@@ -72,26 +72,26 @@ public class PlayerStep : MonoBehaviour
     [SerializeField] public AudioClip sndSwing;
     [SerializeField] public AudioClip sndSwing2;
     [SerializeField] public AudioClip sndSwing3;
-    [SerializeField] private AudioClip sndLand;
-    [SerializeField] private AudioClip sndLand2;
-    [SerializeField] private AudioClip sndHardLand;
-    [SerializeField] private AudioClip sndHardLand2;
+    [SerializeField] public AudioClip sndLand;
+    [SerializeField] public AudioClip sndLand2;
+    [SerializeField] public AudioClip sndHardLand;
+    [SerializeField] public AudioClip sndHardLand2;
     [SerializeField] private AudioClip sndWebSnap;
     [SerializeField] public AudioClip sndWebRelease;
     [SerializeField] private AudioClip sndWebTension;
     [SerializeField] private AudioClip sndWebTension2;
     [SerializeField] private AudioClip sndWebTension3;
     [SerializeField] private AudioClip sndWebShoot;
-    [SerializeField] private AudioClip sndStep;
-    [SerializeField] private AudioClip sndStep2;
+    [SerializeField] public AudioClip sndStep;
+    [SerializeField] public AudioClip sndStep2;
     [SerializeField] private AudioClip sndCrawlStep;
     [SerializeField] private AudioClip sndCrawlStep2;
     [SerializeField] private AudioClip sndAttack;
     [SerializeField] private AudioClip sndAttack2;
     [SerializeField] private AudioClip sndAttack3;
-    [SerializeField] private AudioClip sndSwipe;
-    [SerializeField] private AudioClip sndSwipe2;
-    [SerializeField] private AudioClip sndSwipe3;
+    [SerializeField] public AudioClip sndSwipe;
+    [SerializeField] public AudioClip sndSwipe2;
+    [SerializeField] public AudioClip sndSwipe3;
     [SerializeField] public AudioClip sndQuickHit;
     [SerializeField] public AudioClip sndQuickHit2;
     [SerializeField] public AudioClip sndStrongHit;
@@ -104,6 +104,7 @@ public class PlayerStep : MonoBehaviour
     [SerializeField] public AudioClip sndCarBreak;
     [SerializeField] public AudioClip sndWarning;
     [SerializeField] public AudioClip sndLevelComplete;
+    private float senseSoundTimer = 0f;
     private bool wasGrounded = false;
 
     // Alarms
@@ -368,6 +369,8 @@ public class PlayerStep : MonoBehaviour
                 trigger = false;
         }
 
+        if (senseSoundTimer > 0) senseSoundTimer -= Time.deltaTime;
+
         // Counter detection (enemies in attack state)
         Vector2 origin = transform.position;
         float closestEDistanceC = Mathf.Infinity;
@@ -397,7 +400,13 @@ public class PlayerStep : MonoBehaviour
         if ((trigger || currentCounter != null) && !spiderSense && pState != PlayerState.death)
         {
             Instantiate(sensePrefab, transform.position, Quaternion.identity);
-            audioSrc.PlayOneShot(sndSpiderSense);
+
+            if (senseSoundTimer <= 0f)
+            {
+                audioSrc.PlayOneShot(sndSpiderSense);
+                senseSoundTimer = sndSpiderSense.length;
+            }
+
             spiderSense = true;
         }
         else if (currentCounter == null || !trigger)

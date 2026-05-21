@@ -90,6 +90,8 @@ public class RobotStep : MonoBehaviour
     private bool gaveKey = false;
     [SerializeField] private GameObject keyPrefab;
 
+    private bool hasFallen = false;
+
     // Start is called before the first frame update
     void Start()
     {
@@ -582,7 +584,11 @@ public class RobotStep : MonoBehaviour
         {
             if (normalizedTime >= 0.352f && normalizedTime <= 0.389f)
             {
-                if (Grounded()) audioSrc.PlayOneShot(sndLand);
+                if (Grounded() && !hasFallen)
+                {
+                    audioSrc.PlayOneShot(sndLand);
+                    hasFallen = true;
+                }
 
                 if (!startAlarm6)
                 {
