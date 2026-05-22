@@ -211,6 +211,8 @@ public class PlayerStep : MonoBehaviour
     // Specialized vars for level objects
     private float wireHitCooldown = 0f;
     private bool wireWasActive = false;
+    private int barrierContactDir = 0; // -1 = barrier left, 1 = barrier right, 0 = none
+    public bool againstBarrier = false;
     private float lightningHitCooldown = 0f;
     private bool lightningWasActive = false;
     private float hitCooldown = 0f;
@@ -445,7 +447,13 @@ public class PlayerStep : MonoBehaviour
 
                     dirX = Input.GetAxisRaw("Horizontal");
                     dirY = -Input.GetAxisRaw("Vertical");
-                    rb.velocity = new Vector2(dirX * hsp, rb.velocity.y);
+
+                    float moveX = dirX * hsp;
+                    
+                    // Block movement into a barrier the player is pressed against
+                    if (barrierContactDir == 1 && moveX > 0) moveX = 0f;   // barrier to right, stop rightward push
+                    if (barrierContactDir == -1 && moveX < 0) moveX = 0f;  // barrier to left, stop leftward push
+                    rb.velocity = new Vector2(moveX, rb.velocity.y);
 
                     // Jump
                     if (Input.GetKeyDown("space") && Grounded() && !shoot)
@@ -1330,7 +1338,9 @@ public class PlayerStep : MonoBehaviour
             {
                 anim.speed = 1f;
 
-                if (dirX != 0f) mstate = MovementState.running;
+                bool pushingIntoBarrier = (barrierContactDir == 1 && dirX > 0) || (barrierContactDir == -1 && dirX < 0);
+
+                if (dirX != 0f && !pushingIntoBarrier) mstate = MovementState.running;
                 else mstate = MovementState.idle;
 
                 if (rb.velocity.y > 0.1f) mstate = MovementState.jumping;
@@ -1345,7 +1355,8 @@ public class PlayerStep : MonoBehaviour
         else if (pState == PlayerState.crawl)
         {
             mstate = MovementState.crawling;
-            anim.speed = Mathf.Abs(crawlDir) > 0 ? 1f : 0f;
+            bool crawlPushingIntoBarrier = (barrierContactDir == 1 && crawlDir > 0) || (barrierContactDir == -1 && crawlDir < 0);
+            anim.speed = (Mathf.Abs(crawlDir) > 0 && !crawlPushingIntoBarrier) ? 1f : 0f;
         }
         else if (pState == PlayerState.quickzip)
         {
@@ -2090,5 +2101,29 @@ public class PlayerStep : MonoBehaviour
             AudioClip[] c = { sndHurt, sndHurt2, sndHurt3 };
             audioSrc.PlayOneShot(c[UnityEngine.Random.Range(0, c.Length)]);
         }
+    }
+
+    void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (collision.gameObject.CompareTag("Barrier"))
+        {
+            float dx = collision.transform.position.x - transform.position.x;
+            barrierContactDir = dx > 0 ? 1 : -1;
+        }
+    }
+
+    void OnCollisionStay2D(Collision2D collision)
+    {
+        if (collision.gameObject.CompareTag("Barrier"))
+        {
+            float dx = collision.transform.position.x - transform.position.x;
+            barrierContactDir = dx > 0 ? 1 : -1;
+            rb.gravityScale = 1f;
+        }
+    }
+
+    void OnCollisionExit2D(Collision2D collision)
+    {
+        if (collision.gameObject.CompareTag("Barrier")) barrierContactDir = 0;
     }
 }

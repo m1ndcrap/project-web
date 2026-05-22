@@ -28,6 +28,7 @@ TagManager:
   - Explosive
   - Shocker
   - Hydrant
+  - Barrier
   layers:
   - Default
   - TransparentFX
