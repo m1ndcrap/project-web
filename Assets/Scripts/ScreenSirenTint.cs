@@ -58,6 +58,7 @@ public class ScreenSirenTint : MonoBehaviour
                 imageAlpha = 0f;
                 phase = 2;
             }
+
             UpdateAlpha();
         }
         else if (phase == 2)
@@ -68,6 +69,7 @@ public class ScreenSirenTint : MonoBehaviour
         else if (phase == 3)
         {
             timer -= Time.deltaTime;
+
             if (timer <= 0f)
             {
                 phase = 0;

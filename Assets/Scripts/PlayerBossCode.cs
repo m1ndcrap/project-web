@@ -6,6 +6,7 @@ public class PlayerBossCode : MonoBehaviour
 {
     [SerializeField] private PlayerStep myself;
     Vector2 corner;
+    private bool bossVoicePlaying = false;
 
     void Update()
     {
@@ -40,10 +41,15 @@ public class PlayerBossCode : MonoBehaviour
             {
                 corner = new Vector2(-1.0767f, 3.5459f);
             }
-            //  if (!audio_is_playing(snd_goblin_boss) && !audio_is_playing(snd_boss) && !audio_is_playing(snd_blank))
-            //       audio_play_sound(choose(snd_goblin_boss, snd_boss, snd_blank), 1, false);
 
-            myself.moveTarget = corner; // <- trigger movement
+            if (!bossVoicePlaying)
+            {
+                AudioClip[] bossClips = { myself.sndGoblinBoss, myself.sndBoss};
+                AudioClip randomBossClip = bossClips[Random.Range(0, bossClips.Length + 1)];
+                if (randomBossClip != null) StartCoroutine(PlayBossVoice(randomBossClip));
+            }
+
+            myself.moveTarget = corner;
             myself.coll.size = new Vector2(0.7719507f, 1.863027f);
             myself.coll.offset = new Vector2(-0.3766563f, -0.968719f);
             AudioClip[] clips = { myself.sndSwing, myself.sndSwing2, myself.sndSwing3 };
@@ -52,5 +58,13 @@ public class PlayerBossCode : MonoBehaviour
             myself.pState = PlayerStep.PlayerState.quickzip;
             myself.rb.gravityScale = 0;
         }
+    }
+
+    IEnumerator PlayBossVoice(AudioClip clip)
+    {
+        bossVoicePlaying = true;
+        myself.audioSrc.PlayOneShot(clip);
+        yield return new WaitForSeconds(clip.length);
+        bossVoicePlaying = false;
     }
 }

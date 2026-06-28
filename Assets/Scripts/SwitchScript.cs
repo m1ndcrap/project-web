@@ -27,7 +27,9 @@ public class SwitchScript : MonoBehaviour
         }
 
         if (alarm1 > 0)
+        {
             alarm1 -= 1;
+        }
         else
         {
             if (phase == 1)

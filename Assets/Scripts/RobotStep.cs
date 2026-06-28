@@ -19,7 +19,7 @@ public class RobotStep : MonoBehaviour
     private Camera cam;
 
     public enum MovementState { idle, running, falling, hurt1, hurt2, launched, shocked, sprinting, alertidle, punch1, punch2, kick, backstep, webbed, death, breakfree }
-    public enum EnemyState { normal, death, hurt, shocked, alert, attack, webbed }
+    public enum EnemyState { normal, death, hurt, shocked, alert, attack, webbed, evade }
     public EnemyState eState;
 
     // Sound Files
@@ -71,6 +71,14 @@ public class RobotStep : MonoBehaviour
     private bool backstep = false;
     [SerializeField] private bool breakingWeb = false;
     [SerializeField] private GameObject hitParticlePrefab;
+    private bool isEvading = false;
+    private float evadeTimer = 0f;
+    private float evadeDir = 1f;
+    private bool evadeWillRush = false;
+    private float evadeRushDelay = 0f;
+    public bool isEngaged = true;
+    private float launchGraceTimer = 0f;
+    public float swingKickHitCooldown = 0f;
 
     // health bar
     private int health = 25;
@@ -120,8 +128,8 @@ public class RobotStep : MonoBehaviour
             return;
         }
 
-        //Debug.Log(anim.speed);
-        //Debug.DrawRay(transform.position, (player.transform.position - transform.position).normalized * (player.transform.position - transform.position).normalized.magnitude, Color.red);
+        if (swingKickHitCooldown > 0f)
+            swingKickHitCooldown -= Time.deltaTime;
 
         // Outline Shader Color Control
         if (eState == EnemyState.attack) { outline.color = Color.red; }
@@ -129,11 +137,6 @@ public class RobotStep : MonoBehaviour
         else { outline.color = Color.black; }
 
         collidedWithPlayer = Physics2D.Raycast(transform.position, transform.right * -dirX, 0.65f, playerMask);
-
-        if (eState == EnemyState.hurt || eState == EnemyState.death || player.pState == PlayerStep.PlayerState.dashenemy || eState == EnemyState.attack || (player.transform.position.y - transform.position.y > 0.015f && Grounded()))
-            Physics2D.IgnoreLayerCollision(LayerMask.NameToLayer("Enemy"), LayerMask.NameToLayer("Player"), true);
-        else
-            Physics2D.IgnoreLayerCollision(LayerMask.NameToLayer("Enemy"), LayerMask.NameToLayer("Player"), false);
 
         AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
         distanceFromPlayer = Vector3.Distance(player.transform.position, transform.position);
@@ -144,11 +147,13 @@ public class RobotStep : MonoBehaviour
         Vector2 end = player.transform.position;
         RaycastHit2D[] hits = Physics2D.LinecastAll(start, end);
         noHitHazard = true;
+
         foreach (var hit in hits)
         {
             if (hit.collider != null)
             {
                 LightningScript lightning = hit.collider.GetComponent<LightningScript>();
+
                 if (lightning != null && lightning.phase == 0)
                 {
                     noHitHazard = false;
@@ -160,7 +165,9 @@ public class RobotStep : MonoBehaviour
         if (startAlarm1)
         {
             if (alarm1 > 0)
+            {
                 alarm1 -= 1;
+            }
             else
             {
                 if (eState == EnemyState.normal)
@@ -178,7 +185,9 @@ public class RobotStep : MonoBehaviour
         if (startAlarm2)
         {
             if (alarm2 > 0)
+            {
                 alarm2 -= 1;
+            }
             else
             {
                 if (eState == EnemyState.normal)
@@ -194,7 +203,9 @@ public class RobotStep : MonoBehaviour
         }
 
         if (alarm3 > 0)
+        {
             alarm3 -= 1;
+        }
         else
         {
             if (shocked && eState != EnemyState.attack && eState != EnemyState.webbed)
@@ -204,7 +215,7 @@ public class RobotStep : MonoBehaviour
                 else
                     shocked = false;
             }
-            
+
             if (eState == EnemyState.attack || eState == EnemyState.webbed)
             {
                 shocked = true;
@@ -213,52 +224,73 @@ public class RobotStep : MonoBehaviour
         }
 
         if (alarm4 > 0)
+        {
             alarm4 -= 4;
+        }
         else
         {
             if (eState == EnemyState.alert)
             {
-                if (distanceFromPlayer >= 4.5f || !noHitWall)
-                {
-                    eState = EnemyState.normal;
-                }
+                if (distanceFromPlayer >= 4.5f || !noHitWall) eState = EnemyState.normal;
+                bool canAttack = !player.isEnemyAttacking && Vector3.Distance(player.transform.position, transform.position) <= 2.05f && ((!sprite.flipX && transform.position.x < player.transform.position.x) || (sprite.flipX && transform.position.x > player.transform.position.x)) && noHitWall && noHitHazard;
 
-                if ((!player.isEnemyAttacking) && (Vector3.Distance(player.transform.position, transform.position) <= 2.05f) && ((!sprite.flipX && transform.position.x < player.transform.position.x) || (sprite.flipX && transform.position.x > player.transform.position.x)) && noHitWall)
+                if (canAttack)
                 {
-                    eState = EnemyState.attack;
-                    AudioClip[] clips = { sndAttack, sndAttack2 };
-                    int index = UnityEngine.Random.Range(0, clips.Length);
-                    if (index < clips.Length) { audioSrc.PlayOneShot(clips[index]); }
-                    rb.gravityScale = 0;
-                    int hitIndex = UnityEngine.Random.Range(0, 3);
-                    MovementState mstate = MovementState.idle;
+                    // 25% chance to evade instead of attacking when the player is in range
+                    bool doEvade = Grounded() && UnityEngine.Random.Range(0, 4) == 0;
 
-                    switch (hitIndex)
+                    if (doEvade)
                     {
-                        case 0: { mstate = MovementState.punch1; anim.speed = 0.6f; } break;
-                        case 1: { mstate = MovementState.punch2; anim.speed = 0.6f; } break;
-                        case 2: { mstate = MovementState.kick; kick = true; anim.speed = 1f; } break;
+                        StartEvasion();
                     }
+                    else
+                    {
+                        eState = EnemyState.attack;
+                        AudioClip[] clips = { sndAttack, sndAttack2 };
+                        int index = UnityEngine.Random.Range(0, clips.Length);
+                        if (index < clips.Length) audioSrc.PlayOneShot(clips[index]);
+                        rb.gravityScale = 0;
+                        int hitIndex = UnityEngine.Random.Range(0, 3);
+                        MovementState mstate = MovementState.idle;
 
-                    anim.SetInteger("mstate", (int)mstate);
-                    player.isEnemyAttacking = true;
+                        switch (hitIndex)
+                        {
+                            case 0: mstate = MovementState.punch1; anim.speed = 0.6f; break;
+                            case 1: mstate = MovementState.punch2; anim.speed = 0.6f; break;
+                            case 2: mstate = MovementState.kick; kick = true; anim.speed = 1f; break;
+                        }
+
+                        anim.SetInteger("mstate", (int)mstate);
+                        player.isEnemyAttacking = true;
+                    }
                 }
                 else
                 {
-                    int hitIndex = UnityEngine.Random.Range(0, 3);
+                    // Reset timer and occasionally evade anyway
+                    bool doEvade = Grounded() && UnityEngine.Random.Range(0, 6) == 0;
 
-                    switch (hitIndex)
+                    if (doEvade)
                     {
-                        case 0: { alarm4 = 300; } break;
-                        case 1: { alarm4 = 400; } break;
-                        case 2: { alarm4 = 500; } break;
+                        StartEvasion();
+                    }
+                    else
+                    {
+                        int hitIndex = UnityEngine.Random.Range(0, 3);
+                        switch (hitIndex)
+                        {
+                            case 0: alarm4 = 300; break;
+                            case 1: alarm4 = 400; break;
+                            case 2: alarm4 = 500; break;
+                        }
                     }
                 }
             }
         }
 
         if (alarm5 > 0)
+        {
             alarm5 -= 1;
+        }
         else
         {
             if (eState == EnemyState.webbed && !breakingWeb)
@@ -311,158 +343,239 @@ public class RobotStep : MonoBehaviour
         switch (eState)
         {
             case EnemyState.normal:
-            {
-                rb.velocity = new Vector2(dirX * hsp, rb.velocity.y);
-
-                if ((((Math.Abs(transform.position.x - player.transform.position.x) <= 3f) && ((!sprite.flipX && transform.position.x < player.transform.position.x) || (sprite.flipX && transform.position.x > player.transform.position.x))) || collidedWithPlayer) && !shocked && Grounded() && noHitWall && noHitHazard)
                 {
-                    eState = EnemyState.shocked;
-                    AudioClip[] clips = { sndAlert, sndAlert2, sndAlert3 };
-                    int index = UnityEngine.Random.Range(0, clips.Length);
-                    if (index < clips.Length) { audioSrc.PlayOneShot(clips[index]); }
-                    MovementState mstate = MovementState.shocked;
-                    anim.SetInteger("mstate", (int)mstate);
-                    rb.velocity = new Vector2(0f, rb.velocity.y);
-                    anim.speed = 1f;
-                    shocked = true;
-                    alarm3 = 300;
-                    collidedWithPlayer = false;
+                    float normalVelX = dirX * hsp;
+
+                    bool movingTowardPlayer = Mathf.Sign(dirX) == Mathf.Sign(player.transform.position.x - transform.position.x);
+
+                    if (collidedWithPlayer && movingTowardPlayer && !player.IsPhysicallyPassable())
+                        normalVelX = 0f;
+
+                    rb.velocity = new Vector2(normalVelX, rb.velocity.y);
+
+                    if ((((Math.Abs(transform.position.x - player.transform.position.x) <= 3f) && ((!sprite.flipX && transform.position.x < player.transform.position.x) || (sprite.flipX && transform.position.x > player.transform.position.x))) || collidedWithPlayer) && !shocked && Grounded() && noHitWall && noHitHazard)
+                    {
+                        eState = EnemyState.shocked;
+                        AudioClip[] clips = { sndAlert, sndAlert2, sndAlert3 };
+                        int index = UnityEngine.Random.Range(0, clips.Length);
+                        if (index < clips.Length) { audioSrc.PlayOneShot(clips[index]); }
+                        MovementState mstate = MovementState.shocked;
+                        anim.SetInteger("mstate", (int)mstate);
+                        rb.velocity = new Vector2(0f, rb.velocity.y);
+                        anim.speed = 1f;
+                        shocked = true;
+                        alarm3 = 300;
+                        collidedWithPlayer = false;
+                    }
+
+                    if (!wasGrounded && Grounded() && eState == EnemyState.normal)
+                        audioSrc.PlayOneShot(sndLand);
+
+                    wasGrounded = Grounded();
                 }
+                break;
 
-                if (!wasGrounded && Grounded() && eState == EnemyState.normal)
-                    audioSrc.PlayOneShot(sndLand);
 
-                wasGrounded = Grounded();
-            }
-            break;
+
 
             case EnemyState.hurt:
-            {
-                if ((stateInfo.IsName("Enemy_Launched")))
                 {
-                    if (stateInfo.normalizedTime >= 1f) {anim.speed = 0f;}
-                    
-                    if (Grounded())
+                    if (stateInfo.IsName("Enemy_Launched"))
+                    {
+                        if (launchGraceTimer > 0f) launchGraceTimer -= Time.deltaTime;
+
+                        if (stateInfo.normalizedTime >= 1f) { anim.speed = 0f; }
+
+                        if (Grounded() && launchGraceTimer <= 0f)
+                        {
+                            anim.speed = 1f;
+                            eState = EnemyState.alert;
+                        }
+                    }
+                    else
                     {
                         anim.speed = 1f;
+                        if ((stateInfo.IsName("Enemy_Hit1") && stateInfo.normalizedTime >= 1f) || (stateInfo.IsName("Enemy_Hit2") && stateInfo.normalizedTime >= 1f)) { eState = EnemyState.alert; }
+                    }
+                }
+                break;
+
+
+
+
+            case EnemyState.shocked:
+                {
+                    if (stateInfo.IsName("Enemy_Shocked") && stateInfo.normalizedTime >= 1f)
+                    {
+                        eState = EnemyState.alert;
+                        int hitIndex = UnityEngine.Random.Range(0, 3);
+
+                        switch (hitIndex)
+                        {
+                            case 0: { alarm4 = 300; } break;
+                            case 1: { alarm4 = 400; } break;
+                            case 2: { alarm4 = 500; } break;
+                        }
+                    }
+                }
+                break;
+
+
+
+
+            case EnemyState.alert:
+                {
+                    if (Math.Abs(transform.position.x - player.transform.position.x) > 1.9f)
+                    {
+                        backstep = false;
+
+                        if (transform.position.x < player.transform.position.x)
+                        {
+                            dirX = 1f;
+                            sprite.flipX = false;
+                        }
+                        else
+                        {
+                            dirX = -1f;
+                            sprite.flipX = true;
+                        }
+                    }
+                    else if (Math.Abs(transform.position.x - player.transform.position.x) < 1.7f)
+                    {
+                        backstep = true;
+
+                        if (transform.position.x < player.transform.position.x)
+                        {
+                            dirX = -0.6f;
+                            sprite.flipX = false;
+                        }
+                        else
+                        {
+                            dirX = 0.6f;
+                            sprite.flipX = true;
+                        }
+                    }
+                    else
+                    {
+                        backstep = false;
+                        dirX = 0f;
+                    }
+
+                    float alertVelX = dirX * (3f * hsp);
+
+                    bool movingTowardPlayer = Mathf.Sign(dirX) == Mathf.Sign(player.transform.position.x - transform.position.x);
+
+                    if (collidedWithPlayer && movingTowardPlayer && !player.IsPhysicallyPassable())
+                        alertVelX = 0f;
+
+                    rb.velocity = new Vector2(alertVelX, rb.velocity.y);
+
+                    if (!wasGrounded && Grounded() && eState == EnemyState.alert) // Landing Sound Code
+                        audioSrc.PlayOneShot(sndLand);
+
+                    wasGrounded = Grounded();
+                }
+                break;
+
+
+
+
+            case EnemyState.attack:
+                {
+                    rb.velocity = new Vector2(0f, 0f);
+
+                    if (Math.Abs(player.transform.position.x - transform.position.x) >= 0.45f && ((stateInfo.IsName("Enemy_Kick") && stateInfo.normalizedTime <= 0.31f) || (stateInfo.IsName("Enemy_Punch1") && stateInfo.normalizedTime <= 0.45f) || (stateInfo.IsName("Enemy_Punch2") && stateInfo.normalizedTime <= 0.29f)))
+                    {
+                        float step = 4f * Time.deltaTime;
+                        Vector2 targetPosition = new Vector2(player.transform.position.x, transform.position.y);
+                        transform.position = Vector2.MoveTowards(transform.position, targetPosition, step);
+                        if (targetPosition.x < transform.position.x) { sprite.flipX = true; } else { sprite.flipX = false; }
+                    }
+
+                    if ((stateInfo.IsName("Enemy_Punch1") && stateInfo.normalizedTime >= 1f) || (stateInfo.IsName("Enemy_Punch2") && stateInfo.normalizedTime >= 1f) || (stateInfo.IsName("Enemy_Kick") && stateInfo.normalizedTime >= 1f))
+                    {
+                        int hitIndex = UnityEngine.Random.Range(0, 3);
+
+                        switch (hitIndex)
+                        {
+                            case 0: { alarm4 = 300; } break;
+                            case 1: { alarm4 = 400; } break;
+                            case 2: { alarm4 = 500; } break;
+                        }
+
+                        eState = EnemyState.alert;
+                        player.isEnemyAttacking = false;
+                        anim.speed = 1f;
+                        kick = false;
+                        rb.gravityScale = 1;
+                    }
+                }
+                break;
+
+
+
+
+            case EnemyState.webbed:
+                {
+                    rb.velocity = new Vector2(0f, 0f);
+                    shocked = true;
+
+                    if (anim.GetCurrentAnimatorStateInfo(0).IsName("Enemy_BreakFree") && (anim.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1f))
+                    {
                         eState = EnemyState.alert;
                     }
                 }
-                else
-                {
-                    anim.speed = 1f;
-                    if ((stateInfo.IsName("Enemy_Hit1") && stateInfo.normalizedTime >= 1f) || (stateInfo.IsName("Enemy_Hit2") && stateInfo.normalizedTime >= 1f)) { eState = EnemyState.alert; }
-                }
-            }
-            break;
+                break;
 
-            case EnemyState.shocked:
-            {
-                if (stateInfo.IsName("Enemy_Shocked") && stateInfo.normalizedTime >= 1f)
+            case EnemyState.evade:
                 {
-                    eState = EnemyState.alert;
-                    int hitIndex = UnityEngine.Random.Range(0, 3);
-
-                    switch(hitIndex)
+                    if (evadeTimer > 0f)
                     {
-                        case 0: { alarm4 = 300; } break;
-                        case 1: { alarm4 = 400; } break;
-                        case 2: { alarm4 = 500; } break;
+                        evadeTimer -= Time.deltaTime;
+                        // Fast dash away
+                        rb.velocity = new Vector2(evadeDir * hsp * 4.5f, rb.velocity.y);
+                        sprite.flipX = (evadeDir < 0);
                     }
-                }
-            }
-            break;
-
-            case EnemyState.alert:
-            {
-                if (Math.Abs(transform.position.x - player.transform.position.x) > 1.9f)
-                {
-                    backstep = false;
-
-                    if (transform.position.x < player.transform.position.x)
+                    else if (evadeRushDelay > 0f)
                     {
-                        dirX = 1f;
-                        sprite.flipX = false;
+                        // Brief pause before rushing
+                        rb.velocity = new Vector2(0f, rb.velocity.y);
+                        evadeRushDelay -= Time.deltaTime;
                     }
                     else
                     {
-                        dirX = -1f;
-                        sprite.flipX = true;
+                        // Rush into attack or return to alert
+                        isEvading = false;
+                        if (evadeWillRush && distanceFromPlayer <= 5f && noHitWall)
+                        {
+                            isEngaged = true;
+                            // Jump straight to attack state
+                            eState = EnemyState.attack;
+                            AudioClip[] clips = { sndAttack, sndAttack2 };
+                            int index = UnityEngine.Random.Range(0, clips.Length);
+                            if (index < clips.Length) audioSrc.PlayOneShot(clips[index]);
+                            rb.gravityScale = 0;
+
+                            int hitIndex = UnityEngine.Random.Range(0, 3);
+                            MovementState mstate2 = MovementState.idle;
+                            switch (hitIndex)
+                            {
+                                case 0: { mstate2 = MovementState.punch1; anim.speed = 0.6f; } break;
+                                case 1: { mstate2 = MovementState.punch2; anim.speed = 0.6f; } break;
+                                case 2: { mstate2 = MovementState.kick; kick = true; anim.speed = 1f; } break;
+                            }
+                            anim.SetInteger("mstate", (int)mstate2);
+                            player.isEnemyAttacking = true;
+                        }
+                        else
+                        {
+                            isEngaged = true;
+                            eState = EnemyState.alert;
+                            alarm4 = UnityEngine.Random.Range(200, 350);
+                        }
                     }
                 }
-                else if (Math.Abs(transform.position.x - player.transform.position.x) < 1.7f)
-                {
-                    backstep = true;
-
-                    if (transform.position.x < player.transform.position.x)
-                    {
-                        dirX = -0.6f;
-                        sprite.flipX = false;
-                    }
-                    else
-                    {
-                        dirX = 0.6f;
-                        sprite.flipX = true;
-                    }
-                }
-                else
-                {
-                    backstep = false;
-                    dirX = 0f;
-                }
-
-                rb.velocity = new Vector2(dirX * (3f * hsp), rb.velocity.y);
-
-                if (!wasGrounded && Grounded() && eState == EnemyState.alert) // Landing Sound Code
-                    audioSrc.PlayOneShot(sndLand);
-
-                wasGrounded = Grounded();
-            }
-            break;
-
-            case EnemyState.attack:
-            {
-                rb.velocity = new Vector2(0f, 0f);
-
-                if (Math.Abs(player.transform.position.x - transform.position.x) >= 0.45f && ((stateInfo.IsName("Enemy_Kick") && stateInfo.normalizedTime <= 0.31f) || (stateInfo.IsName("Enemy_Punch1") && stateInfo.normalizedTime <= 0.45f) || (stateInfo.IsName("Enemy_Punch2") && stateInfo.normalizedTime <= 0.29f)))
-                {
-                    float step = 4f * Time.deltaTime;
-                    Vector2 targetPosition = new Vector2(player.transform.position.x, transform.position.y);
-                    transform.position = Vector2.MoveTowards(transform.position, targetPosition, step);
-                    if (targetPosition.x < transform.position.x) { sprite.flipX = true; } else { sprite.flipX = false; }
-                }
-
-                if ((stateInfo.IsName("Enemy_Punch1") && stateInfo.normalizedTime >= 1f) || (stateInfo.IsName("Enemy_Punch2") && stateInfo.normalizedTime >= 1f) || (stateInfo.IsName("Enemy_Kick") && stateInfo.normalizedTime >= 1f))
-                {
-                    int hitIndex = UnityEngine.Random.Range(0, 3);
-
-                    switch (hitIndex)
-                    {
-                        case 0: { alarm4 = 300; } break;
-                        case 1: { alarm4 = 400; } break;
-                        case 2: { alarm4 = 500; } break;
-                    }
-
-                    eState = EnemyState.alert;
-                    player.isEnemyAttacking = false;
-                    anim.speed = 1f;
-                    kick = false;
-                    rb.gravityScale = 1;
-                }
-            }
-            break;
-
-            case EnemyState.webbed:
-            {
-                rb.velocity = new Vector2(0f, 0f);
-                shocked = true;
-
-                if (anim.GetCurrentAnimatorStateInfo(0).IsName("Enemy_BreakFree") && (anim.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1f))
-                {
-                    eState = EnemyState.alert;
-                }
-            }
-            break;
+                break;
         }
 
         UpdateAnimationState();
@@ -482,6 +595,7 @@ public class RobotStep : MonoBehaviour
         if (eState == EnemyState.webbed) return;
         if (eState == EnemyState.shocked) return;
         if (eState == EnemyState.attack) return;
+
         MovementState mstate = MovementState.idle;
 
         if (eState == EnemyState.normal)
@@ -493,7 +607,14 @@ public class RobotStep : MonoBehaviour
             else
                 mstate = MovementState.idle;
 
-            if (rb.velocity.y < -0.1f) { mstate = MovementState.falling; }
+            if (rb.velocity.y < -0.1f && !Grounded()) { mstate = MovementState.falling; }
+        }
+
+        if (eState == EnemyState.evade)
+        {
+            bool movingAwayFromPlayer = (evadeDir < 0 && transform.position.x > player.transform.position.x) || (evadeDir > 0 && transform.position.x < player.transform.position.x);
+            anim.SetInteger("mstate", (int)(movingAwayFromPlayer ? MovementState.backstep : MovementState.sprinting));
+            return;
         }
 
         if (eState == EnemyState.alert)
@@ -505,7 +626,7 @@ public class RobotStep : MonoBehaviour
             else
                 mstate = MovementState.alertidle;
 
-            if (rb.velocity.y < -0.1f) { mstate = MovementState.falling; }
+            if (rb.velocity.y < -0.1f && !Grounded()) { mstate = MovementState.falling; }
         }
 
         if (eState == EnemyState.death)
@@ -637,6 +758,7 @@ public class RobotStep : MonoBehaviour
 
         if (target == this)
         {
+            rb.gravityScale = 1;
             float dir = 0;
 
             if (!player.sprite.flipX)
@@ -674,6 +796,7 @@ public class RobotStep : MonoBehaviour
             if (player.uppercut)
             {
                 mstate = MovementState.launched;
+                launchGraceTimer = 0.15f;
                 AudioClip[] clips2 = { sndStrongHit, sndStrongHit2, };
                 int index2 = UnityEngine.Random.Range(0, clips2.Length);
                 if (index2 < clips2.Length) { audioSrc.PlayOneShot(clips2[index2]); }
@@ -727,21 +850,33 @@ public class RobotStep : MonoBehaviour
 
     public void AttackEvent()
     {
-        Debug.Log(Vector3.Distance(player.transform.position, transform.position));
         if (Vector3.Distance(player.transform.position, transform.position) <= 0.45f) { player.Damage(this); }
     }
     public bool IsOnScreen(Camera cam)
     {
         Vector3 viewportPos = cam.WorldToViewportPoint(transform.position);
-        return viewportPos.x > 0 && viewportPos.x < 1 &&
-               viewportPos.y > 0 && viewportPos.y < 1 &&
-               viewportPos.z > 0;
+        return viewportPos.x > 0 && viewportPos.x < 1 && viewportPos.y > 0 && viewportPos.y < 1 && viewportPos.z > 0;
     }
 
     public void SpawnObjectHitEffect(Vector2 impactPoint, GameObject other)
     {
         Vector3 hitPosition = (transform.position + other.transform.position) / 2f;
         GameObject hitFX = Instantiate(hitParticlePrefab, impactPoint, Quaternion.identity);
+    }
+
+    private void StartEvasion()
+    {
+        isEvading = true;
+        eState = EnemyState.evade;
+        isEngaged = false;
+
+        // Dash away from the player
+        evadeDir = (transform.position.x < player.transform.position.x) ? -1f : 1f;
+        evadeTimer = UnityEngine.Random.Range(0.35f, 0.65f);
+
+        // 50% chance: after evading, rush back in for an attack
+        evadeWillRush = UnityEngine.Random.Range(0, 2) == 0;
+        evadeRushDelay = evadeWillRush ? UnityEngine.Random.Range(0.2f, 0.5f) : 0f;
     }
 
     private void OnTriggerStay2D(Collider2D collision)

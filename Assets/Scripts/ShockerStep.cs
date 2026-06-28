@@ -35,7 +35,6 @@ public class ShockerStep : MonoBehaviour
     [SerializeField] private AudioClip sndDeath;
     [SerializeField] private AudioClip sndShoot;
     [SerializeField] private AudioClip sndShoot2;
-    //[SerializeField] private AudioClip sndWarning;
     [SerializeField] private AudioClip sndWin1;
     [SerializeField] private AudioClip sndWin2;
     [SerializeField] private AudioClip sndShockerIntro;
@@ -80,6 +79,7 @@ public class ShockerStep : MonoBehaviour
     public bool attacking = false;
     public bool collidedWithPlayer = false;
     [SerializeField] private GameObject hitParticlePrefab;
+    public float swingKickHitCooldown = 0f;
 
     // Health bar
     [SerializeField] public int health = 300;
@@ -164,6 +164,9 @@ public class ShockerStep : MonoBehaviour
     {
         distanceFromPlayer = Vector3.Distance(player.transform.position, transform.position);
         bool noHitWall = !Physics2D.Raycast(transform.position, (player.transform.position - transform.position).normalized, distanceFromPlayer, jumpableGround);
+
+        if (swingKickHitCooldown > 0f)
+            swingKickHitCooldown -= Time.deltaTime;
 
         // Outline Shader Color Control
         if (sState == ShockerState.attack) { outline.color = Color.red; }
@@ -291,8 +294,7 @@ public class ShockerStep : MonoBehaviour
                         PlayAttackSounds();
                         sState = ShockerState.attack;
 
-                        // blast = true so the engaged state will trigger a post-blast dash
-                        // away from the player once the attack state finishes
+                        // blast = true so the engaged state will trigger a post-blast dash away from the player once the attack state finishes
                         blast = true;
 
                         player.trigger = true;
@@ -309,7 +311,9 @@ public class ShockerStep : MonoBehaviour
         if (startAlarm11)
         {
             if (alarm11 > 0)
+            {
                 alarm11--;
+            }
             else
             {
                 if (sState == ShockerState.engaged)
@@ -370,7 +374,6 @@ public class ShockerStep : MonoBehaviour
                             phase = 1;
                             player.trigger = true;
                             player.alarm4 = 60;
-                            //audioSrc.PlayOneShot(sndWarning);
                             audioSrc.PlayOneShot(sndShockerIntro);
                             bgmController.GetComponent<BGMController>().intensity = 1;
                         }
@@ -398,11 +401,12 @@ public class ShockerStep : MonoBehaviour
                                 triggerScript.enabled = true;
                                 player.trigger = true;
                                 player.alarm4 = 60;
-                                //audioSrc.PlayOneShot(sndWarning);
                                 AudioClip[] clips = { sndShockerMove };
                                 int index = UnityEngine.Random.Range(0, clips.Length + 1);
+
                                 if (index < clips.Length)
                                     audioSrc.PlayOneShot(clips[index]);
+
                                 bgmController.GetComponent<BGMController>().intensity = 1;
                             }
                         }
@@ -482,17 +486,19 @@ public class ShockerStep : MonoBehaviour
                                 trigger.transform.localScale = new Vector3(5f, 5f, 1f);
                                 player.trigger = true;
                                 player.alarm4 = 60;
-                                //audioSrc.PlayOneShot(sndWarning);
                                 AudioClip[] clips = { sndShockerMove };
                                 int index = UnityEngine.Random.Range(0, clips.Length + 1);
+
                                 if (index < clips.Length)
                                     audioSrc.PlayOneShot(clips[index]);
+
                                 bgmController.GetComponent<BGMController>().intensity = 1;
                             }
                         }
 
                         if (transform.position.x < 76.318f && transform.position.x > 75.541f && transform.position.y < 8.797f && transform.position.y > 2.459f)
                             rb.velocity = new Vector2(rb.velocity.x, 9f);
+
                         if (transform.position.x < 80.361f && transform.position.x > 79.152f && transform.position.y < 8.797f && transform.position.y > 6.401f)
                             rb.velocity = new Vector2(rb.velocity.x, 1.67f);
                     }
@@ -547,11 +553,12 @@ public class ShockerStep : MonoBehaviour
                             trigger.transform.localScale = new Vector3(5f, 5f, 1f);
                             player.trigger = true;
                             player.alarm4 = 60;
-                            //audioSrc.PlayOneShot(sndWarning);
                             AudioClip[] clips = { sndShockerMove };
                             int index = UnityEngine.Random.Range(0, clips.Length + 1);
+
                             if (index < clips.Length)
                                 audioSrc.PlayOneShot(clips[index]);
+
                             bgmController.GetComponent<BGMController>().intensity = 1;
                         }
                     }
@@ -571,14 +578,16 @@ public class ShockerStep : MonoBehaviour
                                 phase = 12;
                                 Destroy(trigger);
                                 trigger = Instantiate(chaseTriggerPrefab, transform.position, Quaternion.identity);
+                                trigger.GetComponent<ObjectiveTrigger>().intensityThree = true;
                                 trigger.transform.localScale = new Vector3(5f, 5f, 1f);
                                 player.trigger = true;
                                 player.alarm4 = 60;
-                                //audioSrc.PlayOneShot(sndWarning);
                                 AudioClip[] clips = { sndShockerMove };
                                 int index = UnityEngine.Random.Range(0, clips.Length + 1);
+
                                 if (index < clips.Length)
                                     audioSrc.PlayOneShot(clips[index]);
+
                                 bgmController.GetComponent<BGMController>().intensity = 1;
                             }
                         }
@@ -601,7 +610,6 @@ public class ShockerStep : MonoBehaviour
                             {
                                 trigger.GetComponent<ObjectiveTrigger>().done = true;
                                 chased = false;
-                                bgmController.GetComponent<BGMController>().intensity = 2;
                                 barrier1.SetActive(true);
                                 barrier2.SetActive(true);
                                 audioSrc.PlayOneShot(sndTrap);
@@ -638,7 +646,14 @@ public class ShockerStep : MonoBehaviour
                         }
                     }
 
-                    rb.velocity = new Vector2(dirX * (moving ? 1f : 2.5f), rb.velocity.y);
+                    float shockerVelX = dirX * (moving ? 1f : 2.5f);
+
+                    bool movingTowardPlayer = Mathf.Sign(dirX) == Mathf.Sign(player.transform.position.x - transform.position.x);
+                    
+                    if (collidedWithPlayer && movingTowardPlayer && !player.IsPhysicallyPassable())
+                        shockerVelX = 0f;
+
+                    rb.velocity = new Vector2(shockerVelX, rb.velocity.y);
 
                     // Normal engaged logic
                     if (!moving)
@@ -698,19 +713,20 @@ public class ShockerStep : MonoBehaviour
                         if (stateInfo.IsName(shootAnim) && stateInfo.normalizedTime >= 0.9f)
                         {
                             int alarmIndex = UnityEngine.Random.Range(0, 3);
+
                             switch (alarmIndex)
                             {
                                 case 0: alarm11 = 60; break;
                                 case 1: alarm11 = 120; break;
                                 case 2: alarm11 = 180; break;
                             }
+
                             alarm12 = 90;
                             threw = false;
                             throwing = false;
                         }
 
-                        if (stateInfo.normalizedTime >= 0.5f && stateInfo.normalizedTime <= 0.53f &&
-                            FindObjectsOfType<PumpkinProjectile>().Length == 0)
+                        if (stateInfo.normalizedTime >= 0.5f && stateInfo.normalizedTime <= 0.53f && FindObjectsOfType<PumpkinProjectile>().Length == 0)
                         {
                             GameObject shockwave = Instantiate(shockwavePrefab, transform.position, Quaternion.identity);
                             shockwave.GetComponent<Shockwave>().type = 1;
@@ -760,6 +776,7 @@ public class ShockerStep : MonoBehaviour
                         (stateInfo.IsName("ShockerKick") && stateInfo.normalizedTime >= 1f))
                     {
                         int hitIndex = UnityEngine.Random.Range(0, 3);
+
                         switch (hitIndex)
                         {
                             case 0: alarm4 = 300; break;
@@ -779,8 +796,8 @@ public class ShockerStep : MonoBehaviour
             case ShockerState.getting_hit:
                 {
                     anim.speed = 1f;
-                    if ((stateInfo.IsName("ShockerHit1") && stateInfo.normalizedTime >= 1f) ||
-                        (stateInfo.IsName("ShockerHit2") && stateInfo.normalizedTime >= 1f))
+
+                    if ((stateInfo.IsName("ShockerHit1") && stateInfo.normalizedTime >= 1f) || (stateInfo.IsName("ShockerHit2") && stateInfo.normalizedTime >= 1f))
                         sState = ShockerState.engaged;
                 }
                 break;
@@ -819,9 +836,13 @@ public class ShockerStep : MonoBehaviour
                 mstate = shootAnim == "ShockerShoot1" ? MovementState.shoot1 : MovementState.shoot2;
             }
             else if (dirX != 0f)
+            {
                 mstate = MovementState.sprinting;
+            }
             else
+            {
                 mstate = MovementState.idle;
+            }
 
             if (rb.velocity.y < -0.1f) mstate = MovementState.falling;
             if (sState == ShockerState.chase && rb.velocity.y > 0.1f) mstate = MovementState.jump;
@@ -836,10 +857,14 @@ public class ShockerStep : MonoBehaviour
             mstate = MovementState.death;
 
             if (normalizedTime >= 0f && normalizedTime <= 0.025f)
+            {
                 if (Grounded()) audioSrc.PlayOneShot(sndDeath);
+            }
 
             if (normalizedTime >= 0.354f && normalizedTime <= 0.405f)
+            {
                 if (Grounded()) audioSrc.PlayOneShot(sndLand);
+            }
 
             if (!startAlarm2)
             {
@@ -938,13 +963,16 @@ public class ShockerStep : MonoBehaviour
             int index = UnityEngine.Random.Range(0, clips.Length);
             if (index < clips.Length) audioSrc.PlayOneShot(clips[index]);
 
+
             int attackTime = UnityEngine.Random.Range(0, 3);
+
             switch (attackTime)
             {
                 case 0: alarm4 = 300; break;
                 case 1: alarm4 = 400; break;
                 case 2: alarm4 = 500; break;
             }
+
 
             anim.SetInteger("mstate", (int)mstate);
         }

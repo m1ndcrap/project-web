@@ -40,50 +40,56 @@ public class HostageScript : MonoBehaviour
         switch (civ)
         {
             case 1:
-            {
-                civScaredAnim = "Civ1_Scared";
-                string[] anims = { "Civ1_Thanks1", "Civ1_Thanks2" };
-                civThanksAnim = anims[UnityEngine.Random.Range(0, anims.Length)];
-            }
-            break;
+                {
+                    civScaredAnim = "Civ1_Scared";
+                    string[] anims = { "Civ1_Thanks1", "Civ1_Thanks2" };
+                    civThanksAnim = anims[UnityEngine.Random.Range(0, anims.Length)];
+                }
+                break;
+
 
             case 2:
-            {
-                civScaredAnim = "Civ2_Scared";
-                string[] anims = { "Civ2_Thanks", "Civ2_Thanks2" };
-                civThanksAnim = anims[UnityEngine.Random.Range(0, anims.Length)];
-            }
-            break;
+                {
+                    civScaredAnim = "Civ2_Scared";
+                    string[] anims = { "Civ2_Thanks", "Civ2_Thanks2" };
+                    civThanksAnim = anims[UnityEngine.Random.Range(0, anims.Length)];
+                }
+                break;
+
 
             case 3:
-            {
-                civScaredAnim = "Civ3_Scared";
-                string[] anims = { "Civ3_Thanks1", "Civ3_Thanks2" };
-                civThanksAnim = anims[UnityEngine.Random.Range(0, anims.Length)];
-            }
-            break;
+                {
+                    civScaredAnim = "Civ3_Scared";
+                    string[] anims = { "Civ3_Thanks1", "Civ3_Thanks2" };
+                    civThanksAnim = anims[UnityEngine.Random.Range(0, anims.Length)];
+                }
+                break;
+
 
             case 4:
-            {
-                civScaredAnim = "Civ4_Scared";
-                string[] anims = { "Civ4_Thanks1", "Civ4_Thanks2" };
-                civThanksAnim = anims[UnityEngine.Random.Range(0, anims.Length)];
-            }
-            break;
+                {
+                    civScaredAnim = "Civ4_Scared";
+                    string[] anims = { "Civ4_Thanks1", "Civ4_Thanks2" };
+                    civThanksAnim = anims[UnityEngine.Random.Range(0, anims.Length)];
+                }
+                break;
+
 
             case 5:
-            {
-                civScaredAnim = "Civ5_Scared";
-                string[] anims = { "Civ5_Thanks1", "Civ5_Thanks2" };
-                civThanksAnim = anims[UnityEngine.Random.Range(0, anims.Length)];
-            }
-            break;
+                {
+                    civScaredAnim = "Civ5_Scared";
+                    string[] anims = { "Civ5_Thanks1", "Civ5_Thanks2" };
+                    civThanksAnim = anims[UnityEngine.Random.Range(0, anims.Length)];
+                }
+                break;
         }
 
         if (phase == 0) { anim.Play(civScaredAnim); }
 
         if (alarm1 > 0)
+        {
             alarm1 -= 1;
+        }
         else
         {
             if (phase == 1)
@@ -101,7 +107,9 @@ public class HostageScript : MonoBehaviour
             phase = 3;
 
         if (alarm2 > 0)
+        {
             alarm2 -= 1;
+        }
         else
         {
             if ((Math.Abs(transform.position.x - player.transform.position.x) <= 5f) && phase == 0)
@@ -174,7 +182,7 @@ public class HostageScript : MonoBehaviour
                 c.a = 0f;
                 sr.color = c;
                 fading = false;
-                Destroy(gameObject); // gameObject.SetActive(false);
+                Destroy(gameObject);
             }
         }
     }

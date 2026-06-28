@@ -1,0 +1,1060 @@
+fileFormatVersion: 2
+guid: df0c17d14de72f14899bf99a95b67509
+TextureImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 0
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 0
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 64
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 16384
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: spr_swing_kick_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: f72c1b99cf3306e4380888318be20098
+      internalID: 174761848
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_1
+      rect:
+        serializedVersion: 2
+        x: 198
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 58de6b4d32fcf314fa163c6007b6e4bf
+      internalID: 126333601
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_2
+      rect:
+        serializedVersion: 2
+        x: 396
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 9e8c542f652fb73449eec12c3246113f
+      internalID: -1566993356
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_3
+      rect:
+        serializedVersion: 2
+        x: 594
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: c81590095bc7db34094b3618ee52133b
+      internalID: -78643281
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_4
+      rect:
+        serializedVersion: 2
+        x: 792
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 669396886bf245841a071dd843f5e980
+      internalID: 510349041
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_5
+      rect:
+        serializedVersion: 2
+        x: 990
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 534f0d78084e3844796dbacc8787e84b
+      internalID: 1924936858
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_6
+      rect:
+        serializedVersion: 2
+        x: 1188
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: b634fd4f26c330a488f9a3974b4f6a36
+      internalID: 1109258393
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_7
+      rect:
+        serializedVersion: 2
+        x: 1386
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 001498ce21cbb4344b00690149d4a3d5
+      internalID: 2104902738
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_8
+      rect:
+        serializedVersion: 2
+        x: 1584
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: a9600085c5935a84b93534b0cd378182
+      internalID: 189854101
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_9
+      rect:
+        serializedVersion: 2
+        x: 1782
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 08e6808dd440d0049863262f9ec96bb2
+      internalID: -1469962487
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_10
+      rect:
+        serializedVersion: 2
+        x: 1980
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 3ab4ff43c74f00f40834a1a18ceac071
+      internalID: -2120236741
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_11
+      rect:
+        serializedVersion: 2
+        x: 2178
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 188ff01d949965d42b671d767a7e1bf9
+      internalID: -743756631
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_12
+      rect:
+        serializedVersion: 2
+        x: 2376
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 50be3c448c4bbfd4fabbfcc04019b08f
+      internalID: 1925555862
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_13
+      rect:
+        serializedVersion: 2
+        x: 2574
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: a587af2382031b0499520a42b0e58a79
+      internalID: -1562597276
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_14
+      rect:
+        serializedVersion: 2
+        x: 2772
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: f0cf55017b788b5408ed7891406c094b
+      internalID: 457553808
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_15
+      rect:
+        serializedVersion: 2
+        x: 2970
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: dcbcbd28629266a438dc6b0cf5b66872
+      internalID: 1867219679
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_16
+      rect:
+        serializedVersion: 2
+        x: 3168
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: bcbad0cdea004ca4db36ed60035f94e4
+      internalID: -604741728
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_17
+      rect:
+        serializedVersion: 2
+        x: 3366
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 8aa443f1a04925e4b8286bff11bc2335
+      internalID: 1298111564
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_18
+      rect:
+        serializedVersion: 2
+        x: 3564
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 6173f97ce261dc643a433d542dc47ed7
+      internalID: -1529762587
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_19
+      rect:
+        serializedVersion: 2
+        x: 3762
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 0b83cd86fed0cc545acb3a6717412aed
+      internalID: -204228785
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_20
+      rect:
+        serializedVersion: 2
+        x: 3960
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 1579d5d398ba506458a5ef4f9f7cf0d8
+      internalID: -528387084
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_21
+      rect:
+        serializedVersion: 2
+        x: 4158
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 4169ddce1897f5f4b89aaf2bc479a173
+      internalID: 1488568078
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_22
+      rect:
+        serializedVersion: 2
+        x: 4356
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 806d086a92631b146b2ca0113e7ed268
+      internalID: -200994980
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_23
+      rect:
+        serializedVersion: 2
+        x: 4554
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 82fb18bce366acc4b95e189294bc0d00
+      internalID: 1359336232
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_24
+      rect:
+        serializedVersion: 2
+        x: 4752
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 086ba5502d512c54b975c6c39b1186c1
+      internalID: -1709330236
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_25
+      rect:
+        serializedVersion: 2
+        x: 4950
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 1a19324e032a4064d8c0089c1ca7e016
+      internalID: -502570075
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_26
+      rect:
+        serializedVersion: 2
+        x: 5148
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 34e8c329a950a3d41bfd7c98d02e884c
+      internalID: 253226309
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_27
+      rect:
+        serializedVersion: 2
+        x: 5346
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 2b6be4e3d8b61a94ba31e1ad74fef35f
+      internalID: -434488713
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_28
+      rect:
+        serializedVersion: 2
+        x: 5544
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 0e648ee2b5f18f24e94d02207ccd0091
+      internalID: 2023971114
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_29
+      rect:
+        serializedVersion: 2
+        x: 5742
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 4b02a5364a1fe78468ad1520e08e4354
+      internalID: -2010720448
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_30
+      rect:
+        serializedVersion: 2
+        x: 5940
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 81d3ec43d66bba040b52433b50190499
+      internalID: -1924162200
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_31
+      rect:
+        serializedVersion: 2
+        x: 6138
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: b1be0508252060f4591ef6963a69f265
+      internalID: 1883394223
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_32
+      rect:
+        serializedVersion: 2
+        x: 6336
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 8d1e817189161ae4f96525aaf49c2c72
+      internalID: 254655932
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_33
+      rect:
+        serializedVersion: 2
+        x: 6534
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: cbcd2ff694521a5489d6de318288d8f4
+      internalID: 902857965
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_34
+      rect:
+        serializedVersion: 2
+        x: 6732
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 05392fc442cbd9f499596603c6a3c97c
+      internalID: 1866815221
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_35
+      rect:
+        serializedVersion: 2
+        x: 6930
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 72bda139cb84c5c4c8643d6ccf56b893
+      internalID: -1884993193
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_36
+      rect:
+        serializedVersion: 2
+        x: 7128
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 739fabc7e26cb4243866319b6bb634d8
+      internalID: -1750187764
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_37
+      rect:
+        serializedVersion: 2
+        x: 7326
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: fec13881cd8a0a348a58bd367e93bbf0
+      internalID: -1719365128
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_38
+      rect:
+        serializedVersion: 2
+        x: 7524
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 4937774807362134f9e23e75f6c0e24c
+      internalID: -44662704
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_39
+      rect:
+        serializedVersion: 2
+        x: 7722
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: c298d931565b46542aba6561c6b099da
+      internalID: 475570327
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_40
+      rect:
+        serializedVersion: 2
+        x: 7920
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 503dd4610a6b0534cbcddd5587297308
+      internalID: -1977226139
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_41
+      rect:
+        serializedVersion: 2
+        x: 8118
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: e67dbeb4d025b9c459dec8ad0453649b
+      internalID: 2076496386
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_swing_kick_42
+      rect:
+        serializedVersion: 2
+        x: 8316
+        y: 0
+        width: 198
+        height: 128
+      alignment: 9
+      pivot: {x: 0.4356948, y: 0.9329928}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 181830e0d4559e642abe6350b440863f
+      internalID: -1003503055
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 5e97eb03825dee720800000000000000
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      spr_swing_kick_0: 174761848
+      spr_swing_kick_1: 126333601
+      spr_swing_kick_10: -2120236741
+      spr_swing_kick_11: -743756631
+      spr_swing_kick_12: 1925555862
+      spr_swing_kick_13: -1562597276
+      spr_swing_kick_14: 457553808
+      spr_swing_kick_15: 1867219679
+      spr_swing_kick_16: -604741728
+      spr_swing_kick_17: 1298111564
+      spr_swing_kick_18: -1529762587
+      spr_swing_kick_19: -204228785
+      spr_swing_kick_2: -1566993356
+      spr_swing_kick_20: -528387084
+      spr_swing_kick_21: 1488568078
+      spr_swing_kick_22: -200994980
+      spr_swing_kick_23: 1359336232
+      spr_swing_kick_24: -1709330236
+      spr_swing_kick_25: -502570075
+      spr_swing_kick_26: 253226309
+      spr_swing_kick_27: -434488713
+      spr_swing_kick_28: 2023971114
+      spr_swing_kick_29: -2010720448
+      spr_swing_kick_3: -78643281
+      spr_swing_kick_30: -1924162200
+      spr_swing_kick_31: 1883394223
+      spr_swing_kick_32: 254655932
+      spr_swing_kick_33: 902857965
+      spr_swing_kick_34: 1866815221
+      spr_swing_kick_35: -1884993193
+      spr_swing_kick_36: -1750187764
+      spr_swing_kick_37: -1719365128
+      spr_swing_kick_38: -44662704
+      spr_swing_kick_39: 475570327
+      spr_swing_kick_4: 510349041
+      spr_swing_kick_40: -1977226139
+      spr_swing_kick_41: 2076496386
+      spr_swing_kick_42: -1003503055
+      spr_swing_kick_5: 1924936858
+      spr_swing_kick_6: 1109258393
+      spr_swing_kick_7: 2104902738
+      spr_swing_kick_8: 189854101
+      spr_swing_kick_9: -1469962487
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

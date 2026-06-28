@@ -27,7 +27,9 @@ public class GeneratorScript : MonoBehaviour
         }
 
         if (alarm1 > 0)
+        {
             alarm1 -= 1;
+        }
         else
         {
             if (phase == 1)
@@ -40,7 +42,11 @@ public class GeneratorScript : MonoBehaviour
         }
 
         AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
-        if (phase == 2 && stateInfo.IsName("GeneratorBreak") && stateInfo.normalizedTime >= 1f) { phase = 3; }
+        
+        if (phase == 2 && stateInfo.IsName("GeneratorBreak") && stateInfo.normalizedTime >= 1f)
+        {
+            phase = 3;
+        }
 
         if (phase == 3) { anim.Play("GeneratorInactive"); }
     }

@@ -8,10 +8,7 @@ using static UnityEditorInternal.VersionControl.ListControl;
 
 public class ShootScript : MonoBehaviour
 {
-    [Range(1, 10)]
     [SerializeField] private float speed = 10f;
-
-    [Range(1, 10)]
     [SerializeField] private float lifeTime = 3f;
 
     private Rigidbody2D rb;
@@ -44,6 +41,7 @@ public class ShootScript : MonoBehaviour
         {
             if (!audioSrc.isPlaying)
                 audioSrc.PlayOneShot(sndWebDestroy);
+
             if (!stateInfo.IsName("WebDestroy")) { anim.Play("WebDestroy"); }
         }
         
@@ -54,8 +52,10 @@ public class ShootScript : MonoBehaviour
             enemy.alarm7 = 30;
             enemy.anim.SetInteger("mstate", 13);
             enemy.alarm5 = 240;
+
             if (!audioSrc.isPlaying)
                 audioSrc.PlayOneShot(sndWebDestroy);
+
             player.alarm3 = 300;
             if (!stateInfo.IsName("WebDestroy")) { anim.Play("WebDestroy"); }
         }
@@ -89,6 +89,7 @@ public class ShootScript : MonoBehaviour
 
             if (!audioSrc.isPlaying)
                 audioSrc.PlayOneShot(sndWebDestroy);
+
             if (!stateInfo.IsName("WebDestroy")) { anim.Play("WebDestroy"); }
         }
 
@@ -100,8 +101,10 @@ public class ShootScript : MonoBehaviour
             shocker.audioSrc.PlayOneShot(shocker.sndShockwaveBlast);
             player.trigger = true;
             player.alarm4 = 60;
+
             if (!audioSrc.isPlaying)
                 audioSrc.PlayOneShot(sndWebDestroy);
+
             if (!stateInfo.IsName("WebDestroy")) { anim.Play("WebDestroy"); }
         }
     }

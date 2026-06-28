@@ -9,8 +9,8 @@ public class Keys : MonoBehaviour
     public int keyIndex = 0;
     public string keyColor = "nothing";
     private Vector2 posToGo = Vector2.zero;
-    [SerializeField] private float moveSpeed = 5f; // Adjust this to control speed (higher = faster)
-    [SerializeField] private float snapDistance = 0.1f; // Distance threshold to snap
+    [SerializeField] private float moveSpeed = 5f;
+    [SerializeField] private float snapDistance = 0.13f;
     private bool hasReachedTarget = false;
 
     void Start()
@@ -21,6 +21,7 @@ public class Keys : MonoBehaviour
     void Update()
     {
         AnimatorStateInfo stateInfo = animator.GetCurrentAnimatorStateInfo(0);
+
         if (player.keys == 0)
         {
             Destroy(gameObject);
@@ -73,24 +74,21 @@ public class Keys : MonoBehaviour
             }
         }
 
-        // Move towards or snap to target position
+        // Move towards or snap to player position
         if (posToGo != Vector2.zero)
         {
             if (!hasReachedTarget)
             {
-                // Smoothly move towards the target
                 transform.position = Vector2.Lerp(transform.position, posToGo, moveSpeed * Time.deltaTime);
 
-                // Check if close enough to snap
                 if (Vector2.Distance(transform.position, posToGo) < snapDistance)
                 {
                     hasReachedTarget = true;
-                    transform.position = posToGo; // Snap to exact position
+                    transform.position = posToGo;
                 }
             }
             else
             {
-                // Once reached, snap to position every frame
                 transform.position = posToGo;
             }
         }

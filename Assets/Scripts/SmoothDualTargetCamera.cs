@@ -56,7 +56,9 @@ public class SmoothDualTargetCamera : MonoBehaviour
             targetOrthographicSize = currentOrthographicSize + sizeIncrease;
         }
         else
+        {
             targetOrthographicSize = minOrthographicSize;
+        }
 
         // Clamp zoom
         targetOrthographicSize = Mathf.Clamp(targetOrthographicSize, minOrthographicSize, maxOrthographicSize);

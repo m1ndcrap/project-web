@@ -29,7 +29,6 @@ public class GliderBullet : MonoBehaviour
         direction2 = (player.transform.position - transform.position).normalized;
         float angle = Mathf.Atan2(direction2.y, direction2.x) * Mathf.Rad2Deg;
         transform.rotation = Quaternion.Euler(0, 0, angle);
-        //transform.rotation = Quaternion.Euler(0, 0, direction);
         audioSource.PlayOneShot(bulletSound, 1f);
         player.trigger = true;
         player.alarm4 = 60;
@@ -169,11 +168,7 @@ public class GliderBullet : MonoBehaviour
         for (int i = 0; i < circleSegments; i++)
         {
             float angle = i * Mathf.PI * 2f / circleSegments;
-            Vector2 pos = new Vector2(
-                Mathf.Cos(angle) * radius,
-                Mathf.Sin(angle) * radius
-            );
-
+            Vector2 pos = new Vector2(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius);
             circleRenderer.SetPosition(i, center + pos);
         }
     }

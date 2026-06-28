@@ -15,8 +15,9 @@ public class PlayerStep : MonoBehaviour
     [SerializeField] public SpriteRenderer sprite;
     [SerializeField] private Transform visual;
     public BoxCollider2D coll;
-    private float dirX = 0f;
-    private float dirY = 0f;
+    public CircleCollider2D collCircle;
+    public float dirX = 0f;
+    public float dirY = 0f;
 
     // Swinging Variables
     private float ropeAngle = 0f;
@@ -30,6 +31,12 @@ public class PlayerStep : MonoBehaviour
     [SerializeField] private float accelerationRate = -0.02f;
     [SerializeField] private bool swingPointSelected = false;
 
+    // Swing Kick Variables
+    private bool swingKickTriggered = false;
+    private List<Component> swingKickTargets = new List<Component>();
+    private float swingKickCooldown = 0f;
+    private const float SwingKickVelocityThreshold = 2.0f;  // ropeAngleVelocity peaks around 2.5-4.0 on a real swing, so 2.0 filters out idle wobble
+
     // Crawling Variables
     [SerializeField] private bool groundDetected;
     [SerializeField] private bool wallDetected;
@@ -39,12 +46,33 @@ public class PlayerStep : MonoBehaviour
     private float groundCheckDistance = 0.1f;
     private float wallCheckDistance = 0.1f;
     private float ceilingCheckDistance = 0.1f;
-    [SerializeField] private bool hasTurn;
     private float ZaxisAdd;
-    [SerializeField] private int direction;
-    private bool isTurning = false;
+    private int direction;
     private float crawlDir = 0f;
     private bool shoot = false;
+
+    // Inner corner system
+    private bool hasTurnInner = false;
+    private bool isTurningInner = false;
+
+    // Outer corner system
+    private bool hasTurnOuter = false;
+    private bool isTurningOuter = false;
+    private float cliffTimer = 0f;
+
+    private bool isTurningLegacy = false;
+
+    // Combined helpers so swing/zip code can still read/reset turn state as one flag
+    private bool hasTurn
+    {
+        get => hasTurnInner || hasTurnOuter;
+        set { hasTurnInner = value; hasTurnOuter = value; }
+    }
+    private bool isTurning
+    {
+        get => isTurningInner || isTurningOuter || isTurningLegacy;
+        set { isTurningInner = value; isTurningOuter = value; isTurningLegacy = value; }
+    }
 
     // Zip Variables
     [SerializeField] private Transform quickZipTarget;
@@ -53,17 +81,18 @@ public class PlayerStep : MonoBehaviour
 
     [SerializeField] private LayerMask jumpableGround;
     [SerializeField] private LayerMask swingPoint;
-    [SerializeField] private float hsp = 4f;
-    [SerializeField] public float jspd = 5f;
+    private float hsp = 4f;
+    public float jspd = 5f;
     [SerializeField] public GameObject ropeSegmentPrefab;
     private float ropeSegmentLength = 0.15f;
     private List<GameObject> ropeSegments = new List<GameObject>();
     private Queue<GameObject> ropeSegmentPool = new Queue<GameObject>();
     private int maxPoolSize = 200;
 
-    public enum MovementState { idle, running, jumping, falling, swinging, endswing, crawling, zip, groundshoot, airshoot, crawlshoot, punch1, punch2, punch3, punch4, airkick, airpunch, kick1, kick2, uppercut, launched, hurt1, hurt2, block1, block2, block3, block4, death }
+    public enum MovementState { idle, running, jumping, falling, swinging, endswing, crawling, zip, groundshoot, airshoot, crawlshoot, punch1, punch2, punch3, punch4, airkick, airpunch, kick1, kick2, uppercut, launched, hurt1, hurt2, block1, block2, block3, block4, death, swingkick }
     public enum PlayerState { normal, swing, crawl, quickzip, dashenemy, hurt, death }
     public PlayerState pState;
+    private PlayerState _prevPState; // last frame's state, used to detect crawl/quickzip enter/exit
 
     // Sound Files
     [SerializeField] public AudioSource audioSrc;
@@ -104,6 +133,8 @@ public class PlayerStep : MonoBehaviour
     [SerializeField] public AudioClip sndCarBreak;
     [SerializeField] public AudioClip sndWarning;
     [SerializeField] public AudioClip sndLevelComplete;
+    [SerializeField] public AudioClip sndGoblinBoss;
+    [SerializeField] public AudioClip sndBoss;
     private float senseSoundTimer = 0f;
     private bool wasGrounded = false;
 
@@ -140,6 +171,7 @@ public class PlayerStep : MonoBehaviour
     public bool spiderSense = false;
     public int combo = 0;
     [SerializeField] private Text comboText;
+    private float postAttackBuffer = 0f;
 
     // Unified combat target
     private Component currentCombatTarget = null;
@@ -174,7 +206,7 @@ public class PlayerStep : MonoBehaviour
         {
             GoblinStep g => g.gState == GoblinStep.GoblinState.engaged,
             ShockerStep s => s.sState == ShockerStep.ShockerState.engaged,
-            RobotStep _ => true,
+            RobotStep r => r.isEngaged,
             _ => false
         };
     }
@@ -220,6 +252,7 @@ public class PlayerStep : MonoBehaviour
     public string keyColor1 = "nothing";
     public string keyColor2 = "nothing";
     public string keyColor3 = "nothing";
+    public bool stopMove = false;
 
     // Calculate dash speed based on distance to a transform
     private float CalcDashSpeed(Transform target, bool isCounter = false)
@@ -288,6 +321,7 @@ public class PlayerStep : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
         coll = GetComponent<BoxCollider2D>();
+        collCircle = GetComponent<CircleCollider2D>();
         pState = PlayerState.normal;
         direction = 1;
         rb.interpolation = RigidbodyInterpolation2D.Interpolate;
@@ -296,18 +330,50 @@ public class PlayerStep : MonoBehaviour
         shocker = FindObjectOfType<ShockerStep>();
     }
 
+    void FixedUpdate()
+    {
+        if (pState == PlayerState.swing)
+        {
+            rb.MovePosition(new Vector2(ropeX, ropeY));
+        }
+    }
+
     void Update()
     {
-        Debug.Log(1 / Time.unscaledDeltaTime);
+        // Crawl and zip are no-clip states, so toggle the collider trigger flag on enter/exit
+        bool isNoClipState = (pState == PlayerState.crawl || pState == PlayerState.quickzip);
+        bool wasNoClipState = (_prevPState == PlayerState.crawl || _prevPState == PlayerState.quickzip);
+
+        if (isNoClipState && !wasNoClipState)
+        {
+            coll.isTrigger = true;
+        }
+        else if (!isNoClipState && wasNoClipState)
+        {
+            coll.isTrigger = false;
+        }
+        _prevPState = pState;
+
+        UpdateBarrierContact();
+
+        Debug.Log(1 / Time.unscaledDeltaTime);  // FPS Counter
         AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
 
         if (swingEnd && stateInfo.IsName("Player_Swing_End") && stateInfo.normalizedTime >= 1f)
             swingEnd = false;
 
-        if (dirX > 0)
-            wallPositionChecker.localPosition = new Vector2(0.325f, -0.389f);
+        if (pState == PlayerState.crawl)
+        {
+            float crawlSign = crawlDir >= 0 ? 1f : -1f;
+            wallPositionChecker.localPosition = new Vector2(0.325f * crawlSign, -0.389f);
+        }
         else
-            wallPositionChecker.localPosition = new Vector2(-0.325f, -0.389f);
+        {
+            if (dirX > 0)
+                wallPositionChecker.localPosition = new Vector2(0.325f, -0.389f);
+            else
+                wallPositionChecker.localPosition = new Vector2(-0.325f, -0.389f);
+        }
 
         Vector2? bestCorner = FindClosestTileTopCorner(transform.position);
 
@@ -398,7 +464,7 @@ public class PlayerStep : MonoBehaviour
 
         if (!countering) currentCounter = closestCounter;
 
-        // Spider-sense
+        // Spider sense
         if ((trigger || currentCounter != null) && !spiderSense && pState != PlayerState.death)
         {
             Instantiate(sensePrefab, transform.position, Quaternion.identity);
@@ -429,14 +495,22 @@ public class PlayerStep : MonoBehaviour
 
         keys = Mathf.Clamp(keys, 0, 3);
 
+        // Gravity scale can get stuck at 0 after an attack ends, this is a safety net to catch that
+        if (rb.gravityScale == 0f)
+        {
+            bool gravityLegitZero = pState == PlayerState.swing || pState == PlayerState.crawl || pState == PlayerState.quickzip || (pState == PlayerState.dashenemy && (attacking || countering));
+            if (!gravityLegitZero) rb.gravityScale = 1f;
+        }
+
+        if (stopMove) pState = PlayerState.normal;
+
         switch (pState)
         {
             case PlayerState.normal:
                 {
                     visual.rotation = Quaternion.Euler(0, 0, 0);
 
-                    bool movementKey = Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.D)
-                                    || Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.RightArrow);
+                    bool movementKey = Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.RightArrow);
                     bool otherKeyPressed = Input.anyKey && !movementKey;
 
                     if (!otherKeyPressed)
@@ -445,18 +519,21 @@ public class PlayerStep : MonoBehaviour
                         coll.offset = new Vector2(-0.03511286f, -0.03012538f);
                     }
 
-                    dirX = Input.GetAxisRaw("Horizontal");
-                    dirY = -Input.GetAxisRaw("Vertical");
+                    if (!stopMove)
+                    {
+                        dirX = Input.GetAxisRaw("Horizontal");
+                        dirY = -Input.GetAxisRaw("Vertical");
+                    }
 
                     float moveX = dirX * hsp;
-                    
+
                     // Block movement into a barrier the player is pressed against
-                    if (barrierContactDir == 1 && moveX > 0) moveX = 0f;   // barrier to right, stop rightward push
-                    if (barrierContactDir == -1 && moveX < 0) moveX = 0f;  // barrier to left, stop leftward push
+                    if (barrierContactDir == 1 && moveX > 0) moveX = 0f;
+                    if (barrierContactDir == -1 && moveX < 0) moveX = 0f;
                     rb.velocity = new Vector2(moveX, rb.velocity.y);
 
                     // Jump
-                    if (Input.GetKeyDown("space") && Grounded() && !shoot)
+                    if (Input.GetKeyDown("space") && Grounded() && !shoot && !stopMove)
                     {
                         AudioClip[] clips = { sndJump, sndJump2 };
                         int index = UnityEngine.Random.Range(0, clips.Length + 1);
@@ -465,7 +542,7 @@ public class PlayerStep : MonoBehaviour
                     }
 
                     // Swing
-                    if (Input.GetKeyDown("space") && !Grounded() && !shoot)
+                    if (Input.GetKeyDown("space") && !Grounded() && !shoot && !stopMove)
                     {
                         Vector2 playerPos = transform.position;
                         Vector2 inputDir = new Vector2(dirX * 2.5f, -dirY * 1.25f);
@@ -528,8 +605,8 @@ public class PlayerStep : MonoBehaviour
                         rb.gravityScale = 0;
                     }
 
-                    // Quick Zip
-                    if (Input.GetKeyDown(KeyCode.I))
+                    // Quick zip to nearest exposed tile corner
+                    if (Input.GetKeyDown(KeyCode.I) && !stopMove)
                     {
                         if (bestCorner.HasValue)
                         {
@@ -538,7 +615,10 @@ public class PlayerStep : MonoBehaviour
                             coll.offset = new Vector2(-0.3766563f, -0.968719f);
                             AudioClip[] clips = { sndSwing, sndSwing2, sndSwing3 };
                             audioSrc.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
+
                             pState = PlayerState.quickzip;
+                            Vector2 zipNudgeDir = (moveTarget.Value - (Vector2)transform.position).normalized;
+                            TeleportRigidbody((Vector2)transform.position + zipNudgeDir * 0.3f);
                             rb.gravityScale = 0;
                         }
                         else
@@ -547,8 +627,8 @@ public class PlayerStep : MonoBehaviour
                         }
                     }
 
-                    // Normal Zip
-                    if (Input.GetKey(KeyCode.U))
+                    // Normal zip, aimed via held input direction and confirmed with a raycast
+                    if (Input.GetKey(KeyCode.U) && !stopMove)
                     {
                         rb.velocity = new Vector2(0f, rb.velocity.y);
                         shoot = true;
@@ -567,35 +647,17 @@ public class PlayerStep : MonoBehaviour
                         }
 
                         Vector2 playerPos = transform.position;
-                        Vector2 inputDir = new Vector2(dirX * 4.5f, -dirY * 1.25f);
-                        Vector2 searchOrigin = (Vector2)playerPos + inputDir;
+                        Vector2 exactDir = new Vector2(dirX, -dirY).normalized;
+                        float maxZipRange = 12f;
 
-                        Debug.DrawLine(transform.position, searchOrigin, UnityEngine.Color.cyan);
-
-                        Collider2D[] hits = Physics2D.OverlapCircleAll(searchOrigin, 3.72f, jumpableGround);
-                        float closestDistance = float.MaxValue;
+                        RaycastHit2D rayHit = Physics2D.Raycast(playerPos, exactDir, maxZipRange, jumpableGround);
                         Vector2 bestAttachPoint = Vector2.zero;
                         bool found = false;
-                        float angleThreshold = 45f;
 
-                        foreach (Collider2D hit in hits)
+                        if (rayHit.collider != null)
                         {
-                            Vector2 point = hit.ClosestPoint(searchOrigin);
-                            Vector2 directionToPoint = (point - playerPos).normalized;
-                            float angle = Vector2.Angle(inputDir, directionToPoint);
-
-                            if (angle > angleThreshold) continue;
-                            if (point.y <= playerPos.y) continue;
-                            if (dirX > 0 && point.x <= playerPos.x) continue;
-                            if (dirX < 0 && point.x >= playerPos.x) continue;
-
-                            float dist = Vector2.Distance(playerPos, point);
-                            if (dist < closestDistance)
-                            {
-                                closestDistance = dist;
-                                bestAttachPoint = point;
-                                found = true;
-                            }
+                            bestAttachPoint = rayHit.point;
+                            found = true;
                         }
 
                         if (found && Input.GetKeyDown("space"))
@@ -604,15 +666,17 @@ public class PlayerStep : MonoBehaviour
                             moveTarget = bestAttachPoint;
                             coll.size = new Vector2(0.7719507f, 1.863027f);
                             coll.offset = new Vector2(-0.3766563f, -0.968719f);
-                            transform.position = new Vector3(transform.position.x, transform.position.y + 0.05f, transform.position.z);
+                            Vector2 zipNudgeDir = (moveTarget.Value - (Vector2)transform.position).normalized;
+                            TeleportRigidbody((Vector2)transform.position + zipNudgeDir * 0.3f);
                             AudioClip[] clips = { sndSwing, sndSwing2, sndSwing3 };
                             audioSrc.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
+
                             pState = PlayerState.quickzip;
                         }
                     }
                     else
                     {
-                        if (shoot)
+                        if (shoot && !stopMove)
                         {
                             if (Input.GetKeyUp(KeyCode.U) && (anim.GetCurrentAnimatorStateInfo(0).IsName("Player_Ground_Shoot") || anim.GetCurrentAnimatorStateInfo(0).IsName("Player_Air_Shoot")))
                             {
@@ -625,9 +689,7 @@ public class PlayerStep : MonoBehaviour
                                 else if (hRaw == 0 && vRaw > 0) rot = transform.rotation * Quaternion.Euler(0f, 0f, 90f);
                                 else if (hRaw < 0 && vRaw > 0) rot = transform.rotation * Quaternion.Euler(0f, 0f, 135f);
                                 else if (hRaw < 0 && vRaw == 0) rot = transform.rotation * Quaternion.Euler(0f, 0f, 180f);
-                                else rot = sprite.flipX
-                                    ? transform.rotation * Quaternion.Euler(0f, 0f, 180f)
-                                    : transform.rotation;
+                                else rot = sprite.flipX ? transform.rotation * Quaternion.Euler(0f, 0f, 180f) : transform.rotation;
 
                                 Instantiate(webPrefab, transform.position, rot);
                                 audioSrc.PlayOneShot(sndWebShoot);
@@ -667,14 +729,18 @@ public class PlayerStep : MonoBehaviour
                         RaycastHit2D hit = Physics2D.Linecast(transform.position, enemy.transform.position, jumpableGround);
                         if (hit.collider != null && (Vector2)hit.point != (Vector2)enemy.transform.position) continue;
 
+
                         // Skip if a hazard is in the way
                         bool noLightning = true;
+
                         foreach (var hl in Physics2D.LinecastAll(transform.position, enemy.transform.position))
                         {
                             LightningScript ls = hl.collider?.GetComponent<LightningScript>();
                             if (ls != null && ls.phase == 0) { noLightning = false; break; }
                         }
+
                         if (!noLightning) continue;
+
 
                         float dx = enemy.transform.position.x - origin.x;
                         if ((facingLeft && dx > 0) || (!facingLeft && dx < 0)) continue;
@@ -684,26 +750,22 @@ public class PlayerStep : MonoBehaviour
                     }
 
                     currentTarget = closestEnemy;
-
-                    // Now resolve the unified combat target
                     currentCombatTarget = ResolveCombatTarget(origin, facingLeft, closestEnemy, closestEDistance);
 
-                    // Attack input (O)
-                    if (Input.GetKey(KeyCode.O) && currentCombatTarget != null)
+                    // Attack (O)
+                    if (Input.GetKey(KeyCode.O) && currentCombatTarget != null && !stopMove)
                     {
                         StartAttackTowardTarget(CombatTargetTransform, attacking: true);
                     }
-                    else if (Input.GetKey(KeyCode.O) && currentCombatTarget == null)
+                    else if (Input.GetKey(KeyCode.O) && currentCombatTarget == null && !stopMove)
                     {
                         StartAttackTowardTarget(null, attacking: false);
                     }
 
                     // Uppercut (L)
-                    if (Input.GetKey(KeyCode.L) && Grounded())
+                    if (Input.GetKey(KeyCode.L) && Grounded() && !stopMove)
                     {
-                        bool targetClose = currentCombatTarget != null &&
-                                           Mathf.Abs(CombatTargetTransform.position.x - origin.x) <= 1f;
-
+                        bool targetClose = currentCombatTarget != null && Mathf.Abs(CombatTargetTransform.position.x - origin.x) <= 1f;
                         dash_spd = targetClose ? CalcDashSpeed(CombatTargetTransform) : 0f;
                         attacking = targetClose;
                         uppercut = targetClose;
@@ -715,7 +777,7 @@ public class PlayerStep : MonoBehaviour
                     }
 
                     // Counter (P)
-                    if (Input.GetKey(KeyCode.P) && Grounded())
+                    if (Input.GetKey(KeyCode.P) && Grounded() && !stopMove)
                     {
                         if (currentCounter != null)
                         {
@@ -742,6 +804,9 @@ public class PlayerStep : MonoBehaviour
                 }
                 break;
 
+
+
+
             case PlayerState.swing:
                 {
                     if (swingPointSelected)
@@ -763,7 +828,33 @@ public class PlayerStep : MonoBehaviour
                     ropeX = grappleX + Mathf.Cos(ropeAngle * Mathf.Deg2Rad) * ropeLength;
                     ropeY = grappleY + Mathf.Sin(ropeAngle * Mathf.Deg2Rad) * ropeLength;
 
-                    rb.MovePosition(new Vector2(ropeX, ropeY));
+                    if (swingKickCooldown > 0f) swingKickCooldown -= Time.deltaTime;
+
+                    // Trigger a swing kick once angular speed is high enough that we're genuinely swinging, not idling
+                    if (!swingKickTriggered && swingKickCooldown <= 0f && Mathf.Abs(ropeAngleVelocity) >= (0.65f * SwingKickVelocityThreshold))
+                    {
+                        List<Component> arcEnemies = ScanSwingArc();
+
+                        if (arcEnemies.Count > 0)
+                        {
+                            swingKickTargets = arcEnemies;
+                            swingKickTriggered = true;
+                            anim.Play("Player_Swing_Kick", 0, 0f);
+                        }
+                    }
+
+                    // Reset kick state once the animation finishes
+                    if (swingKickTriggered)
+                    {
+                        AnimatorStateInfo kickState = anim.GetCurrentAnimatorStateInfo(0);
+
+                        if (kickState.IsName("Player_Swing_Kick") && kickState.normalizedTime >= 1f)
+                        {
+                            swingKickTriggered = false;
+                            swingKickTargets.Clear();
+                            swingKickCooldown = 0.4f;
+                        }
+                    }
 
                     Vector2 ropeDirection = new Vector2(ropeX - grappleX, ropeY - grappleY).normalized;
                     float ropeAngleDeg = Mathf.Atan2(ropeDirection.y, ropeDirection.x) * Mathf.Rad2Deg;
@@ -781,6 +872,9 @@ public class PlayerStep : MonoBehaviour
                         pState = PlayerState.normal;
                         swingEnd = true;
                         ReturnAllRopeSegmentsToPool();
+                        swingKickTriggered = false;
+                        swingKickTargets.Clear();
+                        swingKickCooldown = 0f;
                     }
 
                     float dirOff = sprite.flipX ? -1f : 1f;
@@ -798,6 +892,9 @@ public class PlayerStep : MonoBehaviour
                         pState = PlayerState.normal;
                         ReturnAllRopeSegmentsToPool();
                         rb.gravityScale = 1;
+                        swingKickTriggered = false;
+                        swingKickTargets.Clear();
+                        swingKickCooldown = 0f;
                     }
                     else if (nearWall && dirOff > 0)
                     {
@@ -827,9 +924,15 @@ public class PlayerStep : MonoBehaviour
                         pState = PlayerState.crawl;
                         ReturnAllRopeSegmentsToPool();
                         rb.gravityScale = 0;
+                        swingKickTriggered = false;
+                        swingKickTargets.Clear();
+                        swingKickCooldown = 0f;
                     }
                 }
                 break;
+
+
+
 
             case PlayerState.crawl:
                 {
@@ -837,72 +940,124 @@ public class PlayerStep : MonoBehaviour
                     wasGrounded = true;
                     dirX = Input.GetAxisRaw("Horizontal");
 
-                    crawlDir = direction switch
-                    {
-                        1 => Input.GetAxisRaw("Horizontal") * 2.75f,
-                        3 => Input.GetAxisRaw("Horizontal") * -2.75f,
-                        2 => Input.GetAxisRaw("Vertical") * -2.75f,
-                        _ => Input.GetAxisRaw("Vertical") * 2.75f
-                    };
+                    float rawInput = (direction == 1 || direction == 3) ? Input.GetAxisRaw("Horizontal") : Input.GetAxisRaw("Vertical");
 
-                    rb.velocity = transform.right * crawlDir;
+                    Vector2 worldAxis = (direction == 1 || direction == 3) ? Vector2.right : Vector2.up;
+
+                    float rightAlignment = Vector2.Dot(transform.right, worldAxis);
+                    float crawlSign = rightAlignment >= 0f ? 1f : -1f;
+
+                    crawlDir = rawInput * crawlSign * 2.75f;
+
+                    Vector2 crawlVel = transform.right * crawlDir;
+                    if (barrierContactDir == 1 && crawlVel.x > 0f) crawlVel.x = 0f;
+                    if (barrierContactDir == -1 && crawlVel.x < 0f) crawlVel.x = 0f;
+
+                    if (crawlDir != 0f)
+                    {
+                        float crawlMovSign = Mathf.Sign(crawlDir);
+                        Vector2 crawlProbeOrigin = rb.position;
+                        Vector2 crawlProbeDir = (Vector2)(transform.right * crawlMovSign);
+                        float crawlProbeDist = coll.size.x * 0.5f + 0.2f;
+
+                        RaycastHit2D crawlEnemyHit = Physics2D.Raycast(
+                            crawlProbeOrigin, crawlProbeDir, crawlProbeDist, enemyMask);
+
+                        if (crawlEnemyHit.collider != null && IsEnemySolid(crawlEnemyHit.collider))
+                            crawlVel = Vector2.zero;
+                    }
+
+                    rb.velocity = crawlVel;
 
                     if (isTurning) return;
 
-                    groundDetected = Physics2D.Raycast(groundPositionChecker.position, -transform.up, groundCheckDistance, jumpableGround);
-                    wallDetected = Physics2D.Raycast(wallPositionChecker.position, transform.right * dirX, wallCheckDistance, jumpableGround);
+                    // Snap to the true surface using physical distance from pivot to collider bottom edge
+                    float groundOffsetMagnitude = GetGroundOffsetMagnitude();
+                    float surfaceCastDist = groundOffsetMagnitude + 0.5f;
 
-                    if (!groundDetected && !hasTurn)
+                    RaycastHit2D surfaceHit = Physics2D.Raycast(rb.position, -transform.up, surfaceCastDist, jumpableGround);
+
+                    if (surfaceHit.collider != null)
                     {
-                        if (crawlDir > 0)
+                        rb.position = surfaceHit.point + surfaceHit.normal * groundOffsetMagnitude;
+                    }
+
+                    float halfW = Mathf.Abs(wallPositionChecker.localPosition.x) * transform.localScale.x;
+                    float halfH = Mathf.Abs(groundPositionChecker.localPosition.y) * transform.localScale.y;
+                    float movSign = crawlDir != 0 ? Mathf.Sign(crawlDir) : (sprite.flipX ? -1f : 1f);
+
+                    // Inner corner: turn into a wall found ahead while crawling
+                    if (crawlDir != 0 && !hasTurnInner)
+                    {
+                        Vector2 wallRayOrigin = rb.position + (Vector2)(transform.right * halfW * movSign);
+                        Vector2 wallRayOriginLow = wallRayOrigin - (Vector2)(transform.up * halfH * 0.5f);
+                        wallDetected = Physics2D.Raycast(wallRayOrigin, transform.right * movSign, 0.35f, jumpableGround) || Physics2D.Raycast(wallRayOriginLow, transform.right * movSign, 0.35f, jumpableGround);
+
+                        if (wallDetected)
                         {
-                            ZaxisAdd -= 90;
-                            switch (direction)
+                            hasTurnInner = true;
+
+                            if (crawlDir > 0)
                             {
-                                case 1: StartCoroutine(RotateAroundCorner(new Vector3(0.3f, -0.3f, 0), -90f, 2)); break;
-                                case 2: StartCoroutine(RotateAroundCorner(new Vector3(-0.3f, -0.3f, 0), -90f, 3)); break;
-                                case 3: StartCoroutine(RotateAroundCorner(new Vector3(-0.3f, 0.3f, 0), -90f, 4)); break;
-                                case 4: StartCoroutine(RotateAroundCorner(new Vector3(0.3f, 0.3f, 0), -90f, 1)); break;
+                                ZaxisAdd += 90;
+
+                                switch (direction)
+                                {
+                                    case 1: StartCoroutine(RotateAroundCornerInner(new Vector3(-0.1f, 0.1f, 0), 90f, 4)); break;
+                                    case 2: StartCoroutine(RotateAroundCornerInner(new Vector3(0.3f, 0.1f, 0), 90f, 1)); break;
+                                    case 3: StartCoroutine(RotateAroundCornerInner(new Vector3(0.3f, -0.3f, 0), 90f, 2)); break;
+                                    case 4: StartCoroutine(RotateAroundCornerInner(new Vector3(-0.3f, -0.3f, 0), 90f, 3)); break;
+                                }
                             }
-                        }
-                        else if (crawlDir < 0)
-                        {
-                            ZaxisAdd += 90;
-                            switch (direction)
+                            else
                             {
-                                case 1: StartCoroutine(RotateAroundCorner(new Vector3(-0.35f, -0.3f, 0), 90f, 4)); break;
-                                case 4: StartCoroutine(RotateAroundCorner(new Vector3(0.1f, -0.35f, 0), 90f, 3)); break;
-                                case 3: StartCoroutine(RotateAroundCorner(new Vector3(0.35f, 0.3f, 0), 90f, 2)); break;
-                                case 2: StartCoroutine(RotateAroundCorner(new Vector3(-0.1f, 0.35f, 0), 90f, 1)); break;
+                                ZaxisAdd -= 90;
+
+                                switch (direction)
+                                {
+                                    case 1: StartCoroutine(RotateAroundCornerInner(new Vector3(0.1f, 0.1f, 0), -90f, 2)); break;
+                                    case 2: StartCoroutine(RotateAroundCornerInner(new Vector3(-0.3f, -0.1f, 0), -90f, 3)); break;
+                                    case 3: StartCoroutine(RotateAroundCornerInner(new Vector3(-0.3f, 0.3f, 0), -90f, 4)); break;
+                                    case 4: StartCoroutine(RotateAroundCornerInner(new Vector3(-0.1f, 0.1f, 0), -90f, 1)); break;
+                                }
                             }
                         }
                     }
 
-                    if (groundDetected) hasTurn = false;
-
-                    if (wallDetected && !hasTurn)
+                    // Outer corner: turn around a ledge when the ground runs out ahead
+                    if (crawlDir != 0 && !hasTurnOuter && !hasTurnInner)
                     {
-                        if (crawlDir > 0)
+                        float castDist = halfH + 0.5f;
+                        float footOffset = halfW * 0.8f;
+                        Vector2 frontOrigin = rb.position + (Vector2)(transform.right * footOffset * movSign);
+                        Vector2 frontMidOrigin = rb.position + (Vector2)(transform.right * footOffset * movSign * 0.45f);
+                        Vector2 backOrigin = rb.position + (Vector2)(transform.right * -footOffset * movSign);
+
+                        bool centerOnGround = surfaceHit.collider != null;
+                        bool frontOnGround = Physics2D.Raycast(frontOrigin, -transform.up, castDist, jumpableGround) || Physics2D.Raycast(frontMidOrigin, -transform.up, castDist, jumpableGround);
+                        bool backOnGround = Physics2D.Raycast(backOrigin, -transform.up, castDist, jumpableGround);
+                        groundDetected = backOnGround || centerOnGround;
+
+                        Vector2 wro = rb.position + (Vector2)(transform.right * halfW * movSign);
+                        bool wallAhead = Physics2D.Raycast(wro, transform.right * movSign, 0.35f, jumpableGround) || Physics2D.Raycast(wro - (Vector2)(transform.up * halfH * 0.5f), transform.right * movSign, 0.35f, jumpableGround);
+
+                        if (!frontOnGround && !wallAhead)
                         {
-                            ZaxisAdd += 90;
-                            switch (direction)
+                            cliffTimer += Time.deltaTime;
+
+                            if (cliffTimer >= 0.02f)
                             {
-                                case 1: StartCoroutine(RotateAroundCorner(new Vector3(-0.1f, 0.1f, 0), 90f, 4)); break;
-                                case 2: StartCoroutine(RotateAroundCorner(new Vector3(0.3f, 0.1f, 0), 90f, 1)); break;
-                                case 3: StartCoroutine(RotateAroundCorner(new Vector3(0.3f, -0.3f, 0), 90f, 2)); break;
-                                case 4: StartCoroutine(RotateAroundCorner(new Vector3(-0.3f, -0.3f, 0), 90f, 3)); break;
+                                cliffTimer = 0f;
+                                hasTurnOuter = true;
+                                Vector2 cornerPoint = FindOuterCornerPoint(crawlDir);
+                                float rotSign = crawlDir > 0 ? -1f : 1f;
+                                int nextDir = GetNextDirection(direction, crawlDir > 0 ? -1 : 1);
+                                StartCoroutine(RotateAroundCornerOuter(90f * rotSign, nextDir, cornerPoint));
                             }
                         }
-                        else if (crawlDir < 0)
+                        else if (groundDetected && frontOnGround)
                         {
-                            ZaxisAdd -= 90;
-                            switch (direction)
-                            {
-                                case 1: StartCoroutine(RotateAroundCorner(new Vector3(0.1f, 0.1f, 0), -90f, 2)); break;
-                                case 2: StartCoroutine(RotateAroundCorner(new Vector3(-0.3f, -0.1f, 0), -90f, 3)); break;
-                                case 3: StartCoroutine(RotateAroundCorner(new Vector3(-0.3f, 0.3f, 0), -90f, 4)); break;
-                                case 4: StartCoroutine(RotateAroundCorner(new Vector3(-0.1f, 0.1f, 0), -90f, 1)); break;
-                            }
+                            cliffTimer = 0f;
                         }
                     }
 
@@ -935,6 +1090,7 @@ public class PlayerStep : MonoBehaviour
                                 transform.Translate(new Vector3(0f, -0.1f, 0f));
                                 rb.velocity = new Vector2(0f, -1f);
                             }
+
                             rb.gravityScale = 1;
                             pState = PlayerState.normal;
                         }
@@ -942,8 +1098,42 @@ public class PlayerStep : MonoBehaviour
                 }
                 break;
 
+
+
+
             case PlayerState.quickzip:
                 {
+                    // If the path to the target is blocked by a wall, stop short and start crawling there instead
+                    if (moveTarget.HasValue)
+                    {
+                        Vector2 currentPos = rb.position;
+                        Vector2 target = moveTarget.Value;
+                        Vector2 zipDir = (target - currentPos).normalized;
+
+                        RaycastHit2D wallBlock = Physics2D.Raycast(currentPos, zipDir, 0.4f, jumpableGround);
+
+                        if (wallBlock.collider != null && Vector2.Distance(wallBlock.point, target) > 0.25f)
+                        {
+                            moveTarget = null;
+                            rb.velocity = Vector2.zero;
+
+                            coll.size = new Vector2(0.8397379f, 1.615343f);
+                            coll.offset = new Vector2(-0.03511286f, -0.03012538f);
+                            ReturnAllRopeSegmentsToPool();
+
+                            float surfaceAngle = Mathf.Atan2(wallBlock.normal.y, wallBlock.normal.x) * Mathf.Rad2Deg;
+                            transform.rotation = Quaternion.Euler(0f, 0f, surfaceAngle - 90f);
+
+                            direction = GetDirectionFromRotation();
+
+                            TeleportRigidbody(wallBlock.point + wallBlock.normal * GetGroundOffsetMagnitude());
+
+                            pState = PlayerState.crawl;
+                            rb.gravityScale = 0f;
+                            break;
+                        }
+                    }
+
                     swingEnd = false;
                     bool freezeRotation = false;
 
@@ -961,18 +1151,40 @@ public class PlayerStep : MonoBehaviour
                             if (!freezeRotation) transform.rotation = Quaternion.Euler(0f, 0f, angle - 90);
                         }
 
-                        rb.velocity = zipDir * 4f;
+                        float distToTarget = Vector2.Distance(currentPos, target);
+                        float zipSpeed = Mathf.Lerp(1.5f, 4f, Mathf.Clamp01(distToTarget / 0.8f));
+                        rb.velocity = zipDir * zipSpeed;
 
-                        if (Vector2.Distance(currentPos, target) < 0.25f)
+                        float stopDist = GetGroundOffsetMagnitude() + 0.1f;
+
+                        if (distToTarget <= stopDist)
                         {
                             rb.velocity = Vector2.zero;
                             moveTarget = null;
-                            rb.gravityScale = 1;
-                            transform.rotation = Quaternion.identity;
+
                             coll.size = new Vector2(0.8397379f, 1.615343f);
                             coll.offset = new Vector2(-0.03511286f, -0.03012538f);
-                            pState = PlayerState.normal;
                             ReturnAllRopeSegmentsToPool();
+
+                            RaycastHit2D hit = Physics2D.Raycast(currentPos, zipDir, stopDist + 1f, jumpableGround);
+
+                            if (hit.collider != null)
+                            {
+                                float surfaceAngle = Mathf.Atan2(hit.normal.y, hit.normal.x) * Mathf.Rad2Deg;
+                                transform.rotation = Quaternion.Euler(0f, 0f, surfaceAngle - 90f);
+
+                                TeleportRigidbody(hit.point + hit.normal * GetGroundOffsetMagnitude());
+
+                                direction = GetDirectionFromRotation();
+                                pState = PlayerState.crawl;
+                                rb.gravityScale = 0f;
+                            }
+                            else
+                            {
+                                transform.rotation = Quaternion.identity;
+                                pState = PlayerState.normal;
+                                rb.gravityScale = 1f;
+                            }
                         }
 
                         float xOff = 0f;
@@ -991,19 +1203,19 @@ public class PlayerStep : MonoBehaviour
                         {
                             hasTurn = false; freezeRotation = true;
                             transform.rotation = Quaternion.identity;
-                            StartCoroutine(RotateAroundCorner(new Vector3(-0.1f, 0.1f, 0), 90f, 4));
+                            StartCoroutine(RotateAroundCorner(Vector3.zero, 90f, 4));
                         }
                         else if (nearWall && dirOff < 0)
                         {
                             hasTurn = false; freezeRotation = true;
                             transform.rotation = Quaternion.identity;
-                            StartCoroutine(RotateAroundCorner(new Vector3(0.1f, 0.1f, 0), -90f, 2));
+                            StartCoroutine(RotateAroundCorner(Vector3.zero, -90f, 2));
                         }
                         else if (nearCeiling)
                         {
                             hasTurn = false; freezeRotation = true;
                             transform.rotation = Quaternion.identity;
-                            StartCoroutine(RotateAroundCorner(new Vector3(0f, 0.15f, 0), 180f, 3));
+                            StartCoroutine(RotateAroundCorner(Vector3.zero, 180f, 3));
                         }
 
                         if (nearWall || nearCeiling)
@@ -1011,6 +1223,8 @@ public class PlayerStep : MonoBehaviour
                             moveTarget = null;
                             coll.size = new Vector2(0.8397379f, 1.615343f);
                             coll.offset = new Vector2(-0.03511286f, -0.03012538f);
+                            coll.enabled = true;
+                            collCircle.enabled = false;
                             pState = PlayerState.crawl;
                             ReturnAllRopeSegmentsToPool();
                             rb.gravityScale = 0;
@@ -1019,11 +1233,28 @@ public class PlayerStep : MonoBehaviour
                 }
                 break;
 
+
+
+
             case PlayerState.dashenemy:
                 {
                     // If we lost the target mid-attack, stop attacking
                     if (attacking && currentCombatTarget == null)
                         attacking = false;
+
+                    if (waitingToHit && currentCombatTarget == null && !countering)
+                    {
+                        waitingToHit = false;
+                        anim.speed = 1f;
+                        rb.gravityScale = 1f;
+                    }
+
+                    if (waitingToHit && countering && currentCounter == null)
+                    {
+                        waitingToHit = false;
+                        anim.speed = 1f;
+                        rb.gravityScale = 1f;
+                    }
 
                     if (attacking)
                     {
@@ -1034,6 +1265,7 @@ public class PlayerStep : MonoBehaviour
                         {
                             // Re-evaluate targets after landing a hit
                             bool facingLeft = sprite.flipX;
+
                             if (Input.GetAxisRaw("Horizontal") > 0) facingLeft = false;
                             else if (Input.GetAxisRaw("Horizontal") < 0) facingLeft = true;
 
@@ -1049,13 +1281,17 @@ public class PlayerStep : MonoBehaviour
                                 RaycastHit2D hit2 = Physics2D.Linecast(transform.position, enemy.transform.position, jumpableGround);
                                 if (hit2.collider != null && (Vector2)hit2.point != (Vector2)enemy.transform.position) continue;
 
+
                                 bool noLightning2 = true;
+
                                 foreach (var hl in Physics2D.LinecastAll(transform.position, enemy.transform.position))
                                 {
                                     LightningScript ls = hl.collider?.GetComponent<LightningScript>();
                                     if (ls != null && ls.phase == 0) { noLightning2 = false; break; }
                                 }
+                                
                                 if (!noLightning2) continue;
+
 
                                 float dx2 = enemy.transform.position.x - origin.x;
                                 if ((facingLeft && dx2 > 0) || (!facingLeft && dx2 < 0)) continue;
@@ -1067,9 +1303,11 @@ public class PlayerStep : MonoBehaviour
                             currentTarget = closestEnemy2;
                             currentCombatTarget = ResolveCombatTarget(origin, facingLeft, closestEnemy2, closestEDistance2);
 
+
                             // Re-evaluate counter
                             float ceDist2 = Mathf.Infinity;
                             RobotStep ctr2 = null;
+
                             foreach (var ehitC in ehitsC)
                             {
                                 RobotStep eC = ehitC.GetComponent<RobotStep>();
@@ -1079,7 +1317,9 @@ public class PlayerStep : MonoBehaviour
                                 float dc = Mathf.Abs(eC.transform.position.x - origin.x);
                                 if (dc < ceDist2) { ceDist2 = dc; ctr2 = eC; }
                             }
+
                             currentCounter = ctr2;
+
 
                             // Next attack input
                             if (Input.GetKey(KeyCode.O) && currentCombatTarget != null)
@@ -1104,8 +1344,7 @@ public class PlayerStep : MonoBehaviour
 
                             if (Input.GetKey(KeyCode.L) && Grounded())
                             {
-                                bool targetClose = currentCombatTarget != null &&
-                                                   Mathf.Abs(CombatTargetTransform.position.x - origin.x) <= 1f;
+                                bool targetClose = currentCombatTarget != null && Mathf.Abs(CombatTargetTransform.position.x - origin.x) <= 1f;
                                 dash_spd = targetClose ? CalcDashSpeed(CombatTargetTransform) : 0f;
                                 attacking = targetClose;
                                 uppercut = targetClose;
@@ -1152,8 +1391,7 @@ public class PlayerStep : MonoBehaviour
                         currentCounter.kick = false;
                         currentCounter.rb.gravityScale = 1;
 
-                        if (Mathf.Abs(currentCounter.transform.position.x - transform.position.x) >= 0.45f && !waitingToHit
-                            && IsCounterMoveWindow(stateInfo))
+                        if (Mathf.Abs(currentCounter.transform.position.x - transform.position.x) >= 0.45f && !waitingToHit && IsCounterMoveWindow(stateInfo))
                         {
                             float step = dash_spd * Time.deltaTime;
                             transform.position = Vector2.MoveTowards(transform.position, currentCounter.transform.position, step);
@@ -1162,7 +1400,12 @@ public class PlayerStep : MonoBehaviour
                         if (waitingToHit)
                         {
                             float dist = Mathf.Abs(currentCounter.transform.position.x - transform.position.x);
-                            if (dist < 0.45f) { anim.speed = 1; waitingToHit = false; }
+
+                            if (dist < 0.45f)
+                            {
+                                anim.speed = 1;
+                                waitingToHit = false;
+                            }
                             else
                             {
                                 float step = dash_spd * Time.deltaTime;
@@ -1174,6 +1417,7 @@ public class PlayerStep : MonoBehaviour
                         {
                             pastHitEvent = false;
                             pState = PlayerState.normal;
+                            postAttackBuffer = 0.1f;
                             countering = false;
                             uppercut = false;
                             currentCounter.rb.gravityScale = 1;
@@ -1183,12 +1427,14 @@ public class PlayerStep : MonoBehaviour
                     }
                     else
                     {
+                        rb.gravityScale = 1f;
                         if (Grounded()) rb.velocity = Vector2.zero;
 
                         if (stateInfo.normalizedTime >= 1f)
                         {
                             pastHitEvent = false;
                             pState = PlayerState.normal;
+                            postAttackBuffer = 0.1f;
                             countering = false;
                             anim.speed = 1;
                             uppercut = false;
@@ -1196,6 +1442,9 @@ public class PlayerStep : MonoBehaviour
                     }
                 }
                 break;
+
+
+
 
             case PlayerState.hurt:
                 {
@@ -1216,6 +1465,7 @@ public class PlayerStep : MonoBehaviour
                     else
                     {
                         anim.speed = 1f;
+
                         if ((stateInfo.IsName("Player_Hurt1") || stateInfo.IsName("Player_Hurt2")) && stateInfo.normalizedTime >= 1f)
                         {
                             dirX = 0;
@@ -1227,12 +1477,130 @@ public class PlayerStep : MonoBehaviour
         }
 
         if (pState == PlayerState.swing)
-            DrawRope(new Vector2(grappleX, grappleY), new Vector2(ropeX, ropeY));
+            DrawRope(new Vector2(grappleX, grappleY), rb.position);
 
         if (pState == PlayerState.quickzip && moveTarget.HasValue)
             DrawRope(moveTarget.Value, new Vector2(transform.position.x, transform.position.y));
 
         UpdateAnimationState();
+    }
+
+    // Samples points along the rope's upcoming swing arc and collects every enemy found along the way
+    private List<Component> ScanSwingArc()
+    {
+        int steps = 6;
+        float scanDeg = 15f * Mathf.Sign(ropeAngleVelocity); // scan in direction of travel
+        float scanRadius = 0.55f;
+
+        var seen = new HashSet<Component>();
+        var results = new List<Component>();
+
+        for (int i = 1; i <= steps; i++)
+        {
+            float futureAngleDeg = ropeAngle + scanDeg * (i / (float)steps);
+            Vector2 samplePos = new Vector2(grappleX + Mathf.Cos(futureAngleDeg * Mathf.Deg2Rad) * ropeLength, grappleY + Mathf.Sin(futureAngleDeg * Mathf.Deg2Rad) * ropeLength);
+
+            Collider2D[] hits = Physics2D.OverlapCircleAll(samplePos, scanRadius, enemyMask);
+
+            foreach (var hit in hits)
+            {
+                Component enemy = (Component)hit.GetComponent<RobotStep>() ?? (Component)hit.GetComponent<GoblinStep>() ?? (Component)hit.GetComponent<ShockerStep>();
+                if (enemy == null) continue;
+                if (enemy is RobotStep r && r.eState == RobotStep.EnemyState.death) continue;
+                if (enemy is GoblinStep g && g.gState == GoblinStep.GoblinState.death) continue;
+                if (enemy is ShockerStep s && s.sState == ShockerStep.ShockerState.death) continue;
+
+                // Add each enemy once, even if it shows up in more than one sample step
+                if (seen.Add(enemy))
+                    results.Add(enemy);
+            }
+        }
+
+        return results;
+    }
+
+    // Animation event on the swing kick clip's impact frame, hits every enemy collected by ScanSwingArc
+    public void SwingKickHitEvent()
+    {
+        if (swingKickTargets == null || swingKickTargets.Count == 0) return;
+
+        float hitRange = 1.2f;
+
+        // Borrow the uppercut flag so every enemy hit gets launched, then restore it after
+        bool savedUppercut = uppercut;
+        uppercut = true;
+
+        foreach (Component target in swingKickTargets)
+        {
+            if (target == null) continue;
+
+            MonoBehaviour targetMB = (MonoBehaviour)target;
+
+            // Skip if the target moved out of range or died since the arc was scanned
+            if (Vector2.Distance(transform.position, targetMB.transform.position) > hitRange) continue;
+
+            if (target is RobotStep rd && rd.eState == RobotStep.EnemyState.death) continue;
+            if (target is GoblinStep gd && gd.gState == GoblinStep.GoblinState.death) continue;
+            if (target is ShockerStep sd && sd.sState == ShockerStep.ShockerState.death) continue;
+            
+
+            if (target is RobotStep robot)
+            {
+                if (robot.swingKickHitCooldown <= 0f)
+                {
+                    robot.swingKickHitCooldown = 0.5f;
+                }
+                else
+                {
+                    continue;
+                }
+            }
+
+            if (target is GoblinStep goblin)
+            {
+                if (goblin.swingKickHitCooldown <= 0f)
+                {
+                    goblin.swingKickHitCooldown = 0.5f;
+                }
+                else
+                {
+                    continue;
+                }
+            }
+
+            if (target is ShockerStep shocker)
+            {
+                if (shocker.swingKickHitCooldown <= 0f)
+                {
+                    shocker.swingKickHitCooldown = 0.5f;
+                }
+                else
+                {
+                    continue;
+                }
+            }
+
+
+            switch (target)
+            {
+                case RobotStep rb2: OnHit.Invoke(rb2); break;
+                case GoblinStep g: OnHitG.Invoke(g); break;
+                case ShockerStep s: OnHitS.Invoke(s); break;
+            }
+
+            combo++;
+            alarm3 = 300;
+            SpawnHitEffect(targetMB.transform.position);
+        }
+
+        uppercut = savedUppercut;
+
+        // One swipe sound for the whole kick, regardless of how many enemies got hit
+        if (swingKickTargets.Count > 0)
+        {
+            AudioClip[] clips = { sndSwipe, sndSwipe2, sndSwipe3 };
+            audioSrc.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
+        }
     }
 
     // Resolve which combat target to use (robot, shocker, or boss)
@@ -1243,14 +1611,13 @@ public class PlayerStep : MonoBehaviour
             return boss;
 
         // Mission scene: compare shocker vs closest robot
-        if (SceneManager.GetActiveScene().name == "Mission" && shocker != null
-            && shocker.sState != ShockerStep.ShockerState.death)
+        if (SceneManager.GetActiveScene().name == "Mission" && shocker != null && shocker.sState != ShockerStep.ShockerState.death)
         {
             float shockerDx = shocker.transform.position.x - origin.x;
             bool inFront = !((facingLeft && shockerDx > 0) || (!facingLeft && shockerDx < 0));
             float shockerDist = Mathf.Abs(shockerDx);
 
-            if (inFront && shockerDist <= 5.2f)
+            if (inFront && shockerDist <= 5.2f && shocker.sState != ShockerStep.ShockerState.chase)
             {
                 // Prefer whichever is closer
                 if (closestRobot == null || shockerDist < closestRobotDist)
@@ -1309,6 +1676,8 @@ public class PlayerStep : MonoBehaviour
 
     private void UpdateAnimationState()
     {
+        if (postAttackBuffer > 0f) postAttackBuffer -= Time.deltaTime;
+
         if (pState == PlayerState.hurt) return;
 
         if (pState != PlayerState.crawl)
@@ -1324,7 +1693,10 @@ public class PlayerStep : MonoBehaviour
 
         if (swingEnd) return;
         if (pState == PlayerState.dashenemy) return;
-        
+
+        // Don't override the swing kick animation while it's playing
+        if (swingKickTriggered && anim.GetCurrentAnimatorStateInfo(0).IsName("Player_Swing_Kick")) return;
+
         MovementState mstate = MovementState.idle;
 
         if (pState == PlayerState.normal)
@@ -1340,16 +1712,32 @@ public class PlayerStep : MonoBehaviour
 
                 bool pushingIntoBarrier = (barrierContactDir == 1 && dirX > 0) || (barrierContactDir == -1 && dirX < 0);
 
-                if (dirX != 0f && !pushingIntoBarrier) mstate = MovementState.running;
-                else mstate = MovementState.idle;
-
-                if (rb.velocity.y > 0.1f) mstate = MovementState.jumping;
-                else if (rb.velocity.y < -0.1f) mstate = MovementState.falling;
+                if (Grounded())
+                {
+                    mstate = (dirX != 0f && !pushingIntoBarrier) ? MovementState.running : MovementState.idle;
+                }
+                else if (postAttackBuffer > 0f)
+                {
+                    mstate = (dirX != 0f && !pushingIntoBarrier) ? MovementState.running : MovementState.idle;
+                }
+                else
+                {
+                    mstate = (rb.velocity.y >= 0f) ? MovementState.jumping : MovementState.falling;
+                }
             }
         }
         else if (pState == PlayerState.swing)
         {
-            mstate = MovementState.swinging;
+            // Let a swing kick finish playing before reverting to the swinging pose
+            if (swingKickTriggered)
+            {
+                mstate = MovementState.swingkick;
+            }
+            else
+            {
+                mstate = MovementState.swinging;
+            }
+
             anim.speed = 1f;
         }
         else if (pState == PlayerState.crawl)
@@ -1390,6 +1778,7 @@ public class PlayerStep : MonoBehaviour
                 if (Grounded()) audioSrc.PlayOneShot(sndHardLand);
                 if (!startAlarm2) { alarm2 = 240; startAlarm2 = true; }
             }
+
             if (nt >= 1f) anim.speed = 0f;
         }
 
@@ -1399,6 +1788,35 @@ public class PlayerStep : MonoBehaviour
     public bool Grounded()
     {
         return Physics2D.BoxCast(coll.bounds.center, coll.bounds.size, 0f, Vector2.down, 0.1f, jumpableGround);
+    }
+
+    public bool IsPhysicallyPassable()
+    {
+        if (pState == PlayerState.dashenemy && (attacking || countering)) return true;
+        if (pState == PlayerState.hurt) return true;
+        if (pState == PlayerState.death) return true;
+        return false;
+    }
+
+    // True physical distance from the player's pivot to the collider's bottom edge
+    private float GetGroundOffsetMagnitude()
+    {
+        float colliderHalfHeight = coll.size.y * 0.5f;
+        float colliderBottomLocalY = coll.offset.y - colliderHalfHeight;
+        return Mathf.Abs(colliderBottomLocalY) * transform.localScale.y;
+    }
+
+    private void TeleportRigidbody(Vector2 newPos)
+    {
+        rb.interpolation = RigidbodyInterpolation2D.None;
+        rb.position = newPos;
+        StartCoroutine(RestoreInterpolationNextFixedUpdate());
+    }
+
+    private IEnumerator RestoreInterpolationNextFixedUpdate()
+    {
+        yield return new WaitForFixedUpdate();
+        rb.interpolation = RigidbodyInterpolation2D.Interpolate;
     }
 
     void DrawRope(Vector2 start, Vector2 end)
@@ -1420,6 +1838,7 @@ public class PlayerStep : MonoBehaviour
     GameObject GetRopeSegment(Vector2 position)
     {
         GameObject segment;
+
         if (ropeSegmentPool.Count > 0)
         {
             segment = ropeSegmentPool.Dequeue();
@@ -1429,6 +1848,7 @@ public class PlayerStep : MonoBehaviour
         {
             segment = Instantiate(ropeSegmentPrefab);
         }
+
         segment.transform.position = position;
         ropeSegments.Add(segment);
         return segment;
@@ -1448,40 +1868,243 @@ public class PlayerStep : MonoBehaviour
                 Destroy(seg);
             }
         }
+
         ropeSegments.Clear();
     }
 
-    private void OnDrawGizmosSelected()
+    // Inner corner turn coroutine, rotates in place around the current pivot
+    private IEnumerator RotateAroundCornerInner(Vector3 positionDelta, float rotationDelta, int newDirection)
     {
-        Gizmos.color = new UnityEngine.Color(1f, 1f, 0f, 0.75f);
-        Gizmos.DrawLine(groundPositionChecker.position, new Vector2(groundPositionChecker.position.x, groundPositionChecker.position.y - groundCheckDistance));
-        Gizmos.DrawLine(wallPositionChecker.position, new Vector2(wallPositionChecker.position.x + wallCheckDistance, wallPositionChecker.position.y));
-    }
+        isTurningInner = true;
+        hasTurnInner = true;
 
-    private IEnumerator RotateAroundCorner(Vector3 positionDelta, float rotationDelta, int newDirection)
-    {
-        isTurning = true;
-        hasTurn = true;
-        float duration = 0.2f;
+        if (positionDelta != Vector3.zero)
+            transform.position += positionDelta;
+
+        float startAngle = transform.eulerAngles.z;
+        float targetAngle = startAngle + rotationDelta;
+        float duration = 0.15f;
         float time = 0f;
-        Vector3 startRotation = transform.eulerAngles;
-        Vector3 endRotation = startRotation + new Vector3(0, 0, rotationDelta);
-        Vector3 startPosition = transform.position;
-        Vector3 endPosition = startPosition + positionDelta;
 
         while (time < duration)
         {
             float t = time / duration;
-            transform.eulerAngles = Vector3.Lerp(startRotation, endRotation, t);
-            transform.position = Vector3.Lerp(startPosition, endPosition, t);
+            transform.eulerAngles = new Vector3(0, 0, Mathf.LerpAngle(startAngle, targetAngle, t));
             time += Time.deltaTime;
             yield return null;
         }
 
-        transform.eulerAngles = endRotation;
-        transform.position = endPosition;
+        transform.eulerAngles = new Vector3(0, 0, targetAngle);
         direction = newDirection;
-        isTurning = false;
+
+        rb.position += (Vector2)transform.up * 0.15f;
+        float fixedOffset = GetGroundOffsetMagnitude();
+        RaycastHit2D snapHit = Physics2D.Raycast(rb.position, -transform.up, fixedOffset + 0.6f, jumpableGround);
+
+        if (snapHit.collider != null)
+        {
+            rb.position = snapHit.point + snapHit.normal * fixedOffset;
+        }
+
+        hasTurnInner = false;
+        isTurningInner = false;
+    }
+
+    // Outer corner turn coroutine, rotates around a fixed pivot point at the ledge
+    private IEnumerator RotateAroundCornerOuter(float rotationDelta, int newDirection, Vector2 pivotPoint)
+    {
+        isTurningOuter = true;
+        hasTurnOuter = true;
+
+        float startAngle = transform.eulerAngles.z;
+        float targetAngle = startAngle + rotationDelta;
+        Vector2 startOffset = rb.position - pivotPoint;
+        float duration = 0.15f;
+        float time = 0f;
+
+        while (time < duration)
+        {
+            float t = time / duration;
+            float currentAngle = Mathf.LerpAngle(startAngle, targetAngle, t);
+            transform.eulerAngles = new Vector3(0, 0, currentAngle);
+            rb.position = pivotPoint + RotateVector2(startOffset, currentAngle - startAngle);
+            time += Time.deltaTime;
+            yield return null;
+        }
+
+        transform.eulerAngles = new Vector3(0, 0, targetAngle);
+        rb.position = pivotPoint + RotateVector2(startOffset, targetAngle - startAngle);
+        direction = newDirection;
+
+        float fixedOffset = GetGroundOffsetMagnitude();
+
+        RaycastHit2D snapHit = Physics2D.Raycast(rb.position, -transform.up,
+            fixedOffset + 0.5f,
+            jumpableGround);
+        if (snapHit.collider != null)
+        {
+            rb.position = snapHit.point + snapHit.normal * fixedOffset;
+        }
+        else
+        {
+            RaycastHit2D boxSnap = Physics2D.BoxCast(
+                rb.position,
+                new Vector2(Mathf.Abs(wallPositionChecker.localPosition.x) * 0.6f, 0.05f),
+                transform.eulerAngles.z, -transform.up,
+                fixedOffset + 0.5f,
+                jumpableGround);
+            if (boxSnap.collider != null)
+            {
+                rb.position = boxSnap.point + boxSnap.normal * fixedOffset;
+            }
+        }
+
+        hasTurnOuter = false;
+        isTurningOuter = false;
+    }
+
+    // Old/Legacy turn coroutine system, used only by swing, quickzip, and CanStartCrawling
+    private IEnumerator RotateAroundCorner(Vector3 positionDelta, float rotationDelta, int newDirection)
+    {
+        isTurningLegacy = true;
+
+        if (positionDelta != Vector3.zero)
+            transform.position += positionDelta;
+
+        float startAngle = transform.eulerAngles.z;
+        float targetAngle = startAngle + rotationDelta;
+        float duration = 0.15f;
+        float time = 0f;
+
+        while (time < duration)
+        {
+            float t = time / duration;
+            transform.eulerAngles = new Vector3(0, 0, Mathf.LerpAngle(startAngle, targetAngle, t));
+            time += Time.deltaTime;
+            yield return null;
+        }
+
+        transform.eulerAngles = new Vector3(0, 0, targetAngle);
+        direction = newDirection;
+
+        if (pState == PlayerState.crawl)
+        {
+            rb.position += (Vector2)transform.up * 0.15f;
+            RaycastHit2D snapHit = Physics2D.Raycast(rb.position, -transform.up, Mathf.Abs(groundPositionChecker.localPosition.y) * transform.localScale.y + 0.6f, jumpableGround);
+
+            if (snapHit.collider != null)
+            {
+                float targetDist = Vector2.Distance(rb.position, (Vector2)groundPositionChecker.position);
+                rb.position = snapHit.point + snapHit.normal * targetDist;
+            }
+        }
+
+        isTurningLegacy = false;
+    }
+
+    private Vector2 RotateVector2(Vector2 v, float degrees)
+    {
+        float rad = degrees * Mathf.Deg2Rad;
+        float cos = Mathf.Cos(rad);
+        float sin = Mathf.Sin(rad);
+        return new Vector2(cos * v.x - sin * v.y, sin * v.x + cos * v.y);
+    }
+
+    private int GetNextDirection(int currentDir, int turnSign)
+    {
+        int[] cwCycle = { 1, 2, 3, 4 };
+        int idx = System.Array.IndexOf(cwCycle, currentDir);
+        int nextIdx = (idx + turnSign + 4) % 4;
+        return cwCycle[nextIdx];
+    }
+
+    private int GetDirectionFromRotation()
+    {
+        float z = transform.eulerAngles.z % 360f;
+        if (z < 0) z += 360f;
+        if (z >= 315f || z < 45f) return 1;
+        if (z >= 45f && z < 135f) return 4;
+        if (z >= 135f && z < 225f) return 3;
+        return 2;
+    }
+
+    private Vector2 FindOuterCornerPoint(float crawlDirection)
+    {
+        int searchDirX = 0, searchDirY = 0;
+        bool wantRightCorner = false;
+
+        switch (direction)
+        {
+            case 1: searchDirX = crawlDirection > 0 ? 1 : -1; wantRightCorner = crawlDirection > 0; break;
+            case 3: searchDirX = crawlDirection > 0 ? -1 : 1; wantRightCorner = crawlDirection <= 0; break;
+            case 2: searchDirY = crawlDirection > 0 ? -1 : 1; wantRightCorner = crawlDirection > 0; break;
+            case 4: searchDirY = crawlDirection > 0 ? 1 : -1; wantRightCorner = crawlDirection <= 0; break;
+        }
+
+        float footOff = Mathf.Abs(wallPositionChecker.localPosition.x) * 0.6f;
+        Vector2 backFoot = rb.position - (Vector2)(transform.right * Mathf.Sign(crawlDirection) * footOff);
+
+        Vector2 safeSampleOrigin = backFoot + (Vector2)(transform.up * 0.25f);
+
+        RaycastHit2D surfCheck = Physics2D.Raycast(safeSampleOrigin, -transform.up, 1.5f, jumpableGround);
+        Vector2 samplePoint = surfCheck.collider != null ? surfCheck.point - (Vector2)(transform.up * 0.01f) : rb.position + (Vector2)(-transform.up * 0.2f);
+
+        Vector3Int surfaceCell = tilemap.WorldToCell(samplePoint);
+
+        Vector3Int edgeCell = surfaceCell;
+        bool foundAny = false;
+
+        for (int i = 0; i <= 16; i++)
+        {
+            Vector3Int checkCell = surfaceCell + new Vector3Int(searchDirX * i, searchDirY * i, 0);
+
+            if (tilemap.HasTile(checkCell))
+            {
+                edgeCell = checkCell;
+                foundAny = true;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        if (!foundAny)
+        {
+            Vector2 backPos = rb.position - (Vector2)(transform.right * Mathf.Sign(crawlDirection) * 0.2f);
+            RaycastHit2D fallbackHit = Physics2D.Raycast(backPos, -transform.up, 1.5f, jumpableGround);
+
+            if (fallbackHit.collider != null)
+            {
+                Vector2 fp = fallbackHit.point - (Vector2)(transform.up * 0.01f);
+                edgeCell = tilemap.WorldToCell(fp);
+            }
+        }
+
+        Vector3 worldPos = tilemap.GetCellCenterWorld(edgeCell);
+        Vector3 half = new Vector3(tilemap.cellSize.x * tilemap.transform.localScale.x * 0.5f, tilemap.cellSize.y * tilemap.transform.localScale.y * 0.5f, 0f);
+
+        switch (direction)
+        {
+            case 1:
+                return wantRightCorner
+                    ? new Vector2(worldPos.x + half.x, worldPos.y + half.y)
+                    : new Vector2(worldPos.x - half.x, worldPos.y + half.y);
+            case 3:
+                return wantRightCorner
+                    ? new Vector2(worldPos.x + half.x, worldPos.y - half.y)
+                    : new Vector2(worldPos.x - half.x, worldPos.y - half.y);
+            case 2:
+                return wantRightCorner
+                    ? new Vector2(worldPos.x - half.x, worldPos.y - half.y)
+                    : new Vector2(worldPos.x - half.x, worldPos.y + half.y);
+            case 4:
+                return wantRightCorner
+                    ? new Vector2(worldPos.x + half.x, worldPos.y - half.y)
+                    : new Vector2(worldPos.x + half.x, worldPos.y + half.y);
+            default:
+                return rb.position;
+        }
     }
 
     bool CanStartCrawling()
@@ -1560,21 +2183,21 @@ public class PlayerStep : MonoBehaviour
         Rigidbody2D rb_target = target.GetComponent<Rigidbody2D>();
         AnimatorStateInfo si = anim.GetCurrentAnimatorStateInfo(0);
 
-        // Resolve grounded & engaged via component type
+        // Resolve grounded and engaged via component type
         bool grounded = CombatTargetGrounded();
         bool targetEngaged = CombatTargetIsEngaged();
 
         // Stop target if engaged
-        if (targetEngaged)
+        if (targetEngaged && !pastHitEvent)
             rb_target.velocity = Vector2.zero;
 
         // Face target
         sprite.flipX = target.transform.position.x <= transform.position.x;
 
-        // Aerial attack uses 2D distance, ground uses X-only
+        // Aerial attack uses 2D distance, ground uses X only
         float attackDist = grounded ? 0.45f : 0.2f;
 
-        // Special case: Goblin on glider needs tighter dist
+        // Special case, goblin on glider needs a tighter distance
         if (target.TryGetComponent<GoblinStep>(out var g) && g.gState == GoblinStep.GoblinState.on_glider)
             attackDist = 0.15f;
 
@@ -1592,6 +2215,7 @@ public class PlayerStep : MonoBehaviour
         {
             float step = dash_spd * Time.deltaTime;
             float actualStep = grounded ? step : Mathf.Min(step, dist - 0.05f);
+
             if (actualStep > 0)
                 transform.position = Vector2.MoveTowards(transform.position, target.transform.position, actualStep);
         }
@@ -1607,6 +2231,7 @@ public class PlayerStep : MonoBehaviour
             {
                 float step = dash_spd * Time.deltaTime;
                 float actualStep = grounded ? step : Mathf.Min(step, dist - 0.05f);
+
                 if (actualStep > 0)
                     transform.position = Vector2.MoveTowards(transform.position, target.transform.position, actualStep);
             }
@@ -1616,6 +2241,7 @@ public class PlayerStep : MonoBehaviour
         {
             pastHitEvent = false;
             pState = PlayerState.normal;
+            postAttackBuffer = 0.1f;
             attacking = false;
             uppercut = false;
             rb.gravityScale = 1;
@@ -1626,13 +2252,14 @@ public class PlayerStep : MonoBehaviour
         }
     }
 
-    // HitEvent (called from animation events)
+    // HitEvent, called from animation events
     public void HitEvent()
     {
         if (currentCombatTarget == null) return;
 
         float groundDist = 0.45f;
         float airDist = 0.9f;
+
         bool landed = Grounded()
             ? Vector3.Distance(CombatTargetTransform.position, transform.position) <= groundDist
             : Vector3.Distance(CombatTargetTransform.position, transform.position) <= airDist;
@@ -1645,6 +2272,7 @@ public class PlayerStep : MonoBehaviour
                 case ShockerStep sh: OnHitS.Invoke(sh); break;
                 case RobotStep rb2: OnHit.Invoke(rb2); break;
             }
+
             if (!pastHitEvent) pastHitEvent = true;
             combo++;
             alarm3 = 300;
@@ -1658,16 +2286,15 @@ public class PlayerStep : MonoBehaviour
                 case ShockerStep sh: OnHitS.Invoke(sh); break;
                 case RobotStep rb2: OnHit.Invoke(rb2); break;
             }
+
             combo++;
             alarm3 = 300;
         }
 
-        // Also hit currentCounter target if countering a robot
+        // Also hit currentCounter if countering a robot
         if (countering && currentCounter != null)
         {
-            float cDist = Grounded()
-                ? Vector3.Distance(currentCounter.transform.position, transform.position)
-                : Vector3.Distance(currentCounter.transform.position, transform.position);
+            float cDist = Vector3.Distance(currentCounter.transform.position, transform.position);
 
             if (cDist <= (Grounded() ? groundDist : airDist))
             {
@@ -1686,11 +2313,13 @@ public class PlayerStep : MonoBehaviour
         if (attacking && tAnim != null)
         {
             anim.speed = 0;
+
             if (CombatTargetIsEngaged())
             {
                 tAnim.speed = 0;
                 tRB.velocity = Vector2.zero;
             }
+
             waitingToHit = true;
         }
 
@@ -1703,57 +2332,29 @@ public class PlayerStep : MonoBehaviour
         }
     }
 
-    public void SpawnHitEffect(Vector2 impactPoint)
-    {
-        Instantiate(hitParticlePrefab, impactPoint, Quaternion.identity);
-    }
+    public void SpawnHitEffect(Vector2 impactPoint) { Instantiate(hitParticlePrefab, impactPoint, Quaternion.identity); }
+    public void SpawnHurtEffect(Vector2 impactPoint) { Instantiate(hurtParticlePrefab, impactPoint, Quaternion.identity); }
 
-    public void SpawnHurtEffect(Vector2 impactPoint)
-    {
-        Instantiate(hurtParticlePrefab, impactPoint, Quaternion.identity);
-    }
-
-    // Damage methods (called by enemies)
+    // Damage methods, called by enemies
     public void Damage(RobotStep target)
     {
         if (pState == PlayerState.death) return;
-
-        if (!countering)
-        {
-            ApplyHurtFromEnemy(target.sprite.flipX, target.kick, target.transform.position);
-        }
-        else
-        {
-            currentCounter?.OnPlayerHit(currentCounter);
-        }
+        if (!countering) ApplyHurtFromEnemy(target.sprite.flipX, target.kick, target.transform.position);
+        else currentCounter?.OnPlayerHit(currentCounter);
     }
 
     public void DamageGoblin(GoblinStep target)
     {
         if (pState == PlayerState.death) return;
-
-        if (!countering)
-        {
-            ApplyHurtFromEnemy(target.sprite.flipX, false, target.transform.position);
-        }
-        else
-        {
-            target.OnPlayerHit(target);
-        }
+        if (!countering) ApplyHurtFromEnemy(target.sprite.flipX, false, target.transform.position);
+        else target.OnPlayerHit(target);
     }
 
     public void DamageShocker(ShockerStep target)
     {
         if (pState == PlayerState.death) return;
-
-        if (!countering)
-        {
-            ApplyHurtFromEnemy(target.sprite.flipX, target.kick, target.transform.position);
-        }
-        else
-        {
-            target.OnPlayerHit(target);
-        }
+        if (!countering) ApplyHurtFromEnemy(target.sprite.flipX, target.kick, target.transform.position);
+        else target.OnPlayerHit(target);
     }
 
     private void ApplyHurtFromEnemy(bool enemyFacingLeft, bool isKick, Vector3 enemyPos)
@@ -1767,6 +2368,7 @@ public class PlayerStep : MonoBehaviour
         pState = PlayerState.hurt;
 
         MovementState mstate;
+
         if (isKick)
         {
             mstate = MovementState.launched;
@@ -1808,15 +2410,87 @@ public class PlayerStep : MonoBehaviour
         if (keyToRemove == null) return;
 
         keys--;
+
         if (removedKeyIndex == 1) { keyColor1 = keyColor2; keyColor2 = keyColor3; keyColor3 = "nothing"; }
         else if (removedKeyIndex == 2) { keyColor2 = keyColor3; keyColor3 = "nothing"; }
         else if (removedKeyIndex == 3) { keyColor3 = "nothing"; }
 
         foreach (Keys key in allKeys)
+        {
             if (key != keyToRemove && key.keyIndex > removedKeyIndex)
                 key.keyIndex--;
+        }
 
         Destroy(keyToRemove.gameObject);
+    }
+
+    private void UpdateBarrierContact()
+    {
+        Bounds b = coll.bounds;
+        Vector2 probeSize = new Vector2(b.size.x + 0.1f, b.size.y * 0.9f);
+        Collider2D[] hits = Physics2D.OverlapBoxAll(b.center, probeSize, 0f);
+
+        barrierContactDir = 0;
+
+        foreach (var hit in hits)
+        {
+            if (hit.gameObject == this.gameObject) continue;
+            if (!hit.CompareTag("Barrier")) continue;
+
+            float dx = hit.transform.position.x - transform.position.x;
+            barrierContactDir = dx > 0 ? 1 : -1;
+            break;
+        }
+
+        bool playerIsPassable = IsPhysicallyPassable() || pState == PlayerState.crawl || pState == PlayerState.quickzip || pState == PlayerState.swing;
+
+        if (barrierContactDir == 0 && !playerIsPassable)
+        {
+            float castDist = b.size.x * 0.5f + 0.15f;
+            float castH = b.size.y * 0.75f;
+            Vector2 castSize = new Vector2(0.05f, castH);
+
+            RaycastHit2D rHit = Physics2D.BoxCast(b.center, castSize, 0f, Vector2.right, castDist, enemyMask);
+
+            if (rHit.collider != null && IsEnemySolid(rHit.collider))
+                barrierContactDir = 1;
+
+            if (barrierContactDir == 0)
+            {
+                RaycastHit2D lHit = Physics2D.BoxCast(b.center, castSize, 0f, Vector2.left, castDist, enemyMask);
+
+                if (lHit.collider != null && IsEnemySolid(lHit.collider))
+                    barrierContactDir = -1;
+            }
+        }
+    }
+
+    private bool IsEnemySolid(Collider2D enemyColl)
+    {
+        RobotStep robot = enemyColl.GetComponent<RobotStep>();
+
+        if (robot != null)
+        {
+            return robot.eState == RobotStep.EnemyState.normal ||
+                   robot.eState == RobotStep.EnemyState.shocked ||
+                   robot.eState == RobotStep.EnemyState.alert ||
+                   robot.eState == RobotStep.EnemyState.evade;
+        }
+
+
+        GoblinStep goblin = enemyColl.GetComponent<GoblinStep>();
+
+        if (goblin != null)
+            return goblin.gState == GoblinStep.GoblinState.engaged;
+
+
+        ShockerStep shocker = enemyColl.GetComponent<ShockerStep>();
+
+        if (shocker != null)
+            return shocker.sState == ShockerStep.ShockerState.engaged;
+
+
+        return false;
     }
 
     private void OnTriggerEnter2D(Collider2D collision)
@@ -1874,8 +2548,7 @@ public class PlayerStep : MonoBehaviour
 
             if (carNormal && pState == PlayerState.dashenemy && hittingToward && IsAttackMoveWindow(si))
             {
-                rb.WakeUp();
-                rb.position = rb.position;
+                rb.WakeUp(); rb.position = rb.position;
                 audioSrc.PlayOneShot(sndCarBreak);
                 collision.GetComponent<Animator>().Play("CarBreak");
             }
@@ -1885,10 +2558,10 @@ public class PlayerStep : MonoBehaviour
         {
             rb.WakeUp();
             AnimatorStateInfo si = anim.GetCurrentAnimatorStateInfo(0);
+
             if (collision.gameObject.GetComponent<BreakableDoor>().phase == 0 && pState == PlayerState.dashenemy && IsAttackMoveWindow(si))
             {
-                rb.WakeUp();
-                rb.position = rb.position;
+                rb.WakeUp(); rb.position = rb.position;
                 collision.gameObject.GetComponent<BreakableDoor>().phase = 1;
             }
         }
@@ -1896,6 +2569,7 @@ public class PlayerStep : MonoBehaviour
         if (collision.gameObject.CompareTag("RedKeyDoor"))
         {
             rb.WakeUp();
+
             if (collision.gameObject.GetComponent<KeyDoors>().phase == 0 && keys > 0 && (keyColor1 == "red" || keyColor2 == "red" || keyColor3 == "red"))
             {
                 rb.WakeUp(); rb.position = rb.position;
@@ -1907,6 +2581,7 @@ public class PlayerStep : MonoBehaviour
         if (collision.gameObject.CompareTag("BlueKeyDoor"))
         {
             rb.WakeUp();
+
             if (collision.gameObject.GetComponent<KeyDoors>().phase == 0 && keys > 0 && (keyColor1 == "blue" || keyColor2 == "blue" || keyColor3 == "blue"))
             {
                 rb.WakeUp(); rb.position = rb.position;
@@ -1918,6 +2593,7 @@ public class PlayerStep : MonoBehaviour
         if (collision.gameObject.CompareTag("YellowKeyDoor"))
         {
             rb.WakeUp();
+
             if (collision.gameObject.GetComponent<KeyDoors>().phase == 0 && keys > 0 && (keyColor1 == "yellow" || keyColor2 == "yellow" || keyColor3 == "yellow"))
             {
                 rb.WakeUp(); rb.position = rb.position;
@@ -1930,6 +2606,7 @@ public class PlayerStep : MonoBehaviour
         {
             rb.WakeUp();
             AnimatorStateInfo si = anim.GetCurrentAnimatorStateInfo(0);
+
             if (collision.gameObject.GetComponent<SwitchScript>().phase == 0 && pState == PlayerState.dashenemy && IsAttackMoveWindow(si))
             {
                 rb.WakeUp(); rb.position = rb.position;
@@ -1941,6 +2618,7 @@ public class PlayerStep : MonoBehaviour
         {
             rb.WakeUp();
             AnimatorStateInfo si = anim.GetCurrentAnimatorStateInfo(0);
+
             if (collision.gameObject.GetComponent<ExplosiveScript>().phase == 0 && pState == PlayerState.dashenemy && IsAttackMoveWindow(si))
             {
                 rb.WakeUp(); rb.position = rb.position;
@@ -1952,6 +2630,7 @@ public class PlayerStep : MonoBehaviour
         {
             rb.WakeUp();
             AnimatorStateInfo si = anim.GetCurrentAnimatorStateInfo(0);
+
             if (collision.gameObject.GetComponent<GeneratorScript>().phase == 0 && pState == PlayerState.dashenemy && IsAttackMoveWindow(si))
             {
                 rb.WakeUp(); rb.position = rb.position;
@@ -1972,20 +2651,15 @@ public class PlayerStep : MonoBehaviour
 
             if (!wireIsActive) { wireHitCooldown = 0f; return; }
             if (wireHitCooldown > 0f) { wireHitCooldown -= Time.deltaTime; return; }
-
             wireHitCooldown = 0.05f;
 
             float dir = sprite.flipX ? 1f : -1f;
             rb.velocity = new Vector2(dir * 1.5f, 5f);
-            anim.speed = 1f;
-            combo = 0;
-            pState = PlayerState.hurt;
+            anim.speed = 1f; combo = 0; pState = PlayerState.hurt;
             anim.SetInteger("mstate", (int)MovementState.launched);
             enemyHitSpawn = collision.transform.position;
             SpawnHurtEffect(transform.position);
-            health -= 8;
-            healthbar.UpdateHealthBar(health, maxHealth);
-
+            health -= 8; healthbar.UpdateHealthBar(health, maxHealth);
             AudioClip[] c2 = { sndStrongHit, sndStrongHit2 };
             audioSrc.PlayOneShot(c2[UnityEngine.Random.Range(0, c2.Length)]);
             AudioClip[] c = { sndHurt, sndHurt2, sndHurt3 };
@@ -2004,21 +2678,16 @@ public class PlayerStep : MonoBehaviour
             lightningWasActive = wireIsActive;
             if (!wireIsActive) return;
             if (lightningHitCooldown > 0f) { lightningHitCooldown -= Time.deltaTime; return; }
-
             lightningHitCooldown = 0.15f;
 
             float dir = sprite.flipX ? 1f : -1f;
             rb.velocity = new Vector2(dir * 2f, 5f);
-            anim.speed = 1f;
-            combo = 0;
-            pState = PlayerState.hurt;
+            anim.speed = 1f; combo = 0; pState = PlayerState.hurt;
             MovementState mstate = UnityEngine.Random.Range(0, 2) == 0 ? MovementState.hurt1 : MovementState.hurt2;
             anim.SetInteger("mstate", (int)mstate);
             enemyHitSpawn = collision.transform.position;
             SpawnHurtEffect(transform.position);
-            health -= 8;
-            healthbar.UpdateHealthBar(health, maxHealth);
-
+            health -= 8; healthbar.UpdateHealthBar(health, maxHealth);
             AudioClip[] c2 = { sndQuickHit, sndQuickHit2 };
             audioSrc.PlayOneShot(c2[UnityEngine.Random.Range(0, c2.Length)]);
             AudioClip[] c = { sndHurt, sndHurt2, sndHurt3 };
@@ -2035,15 +2704,11 @@ public class PlayerStep : MonoBehaviour
             float dir = sprite.flipX ? 1f : -1f;
             float dY = collision.transform.position.y > transform.position.y ? -0.7f : 1f;
             rb.velocity = new Vector2(dir * 2f, 5f * dY);
-            anim.speed = 1f;
-            combo = 0;
-            pState = PlayerState.hurt;
+            anim.speed = 1f; combo = 0; pState = PlayerState.hurt;
             anim.SetInteger("mstate", (int)MovementState.launched);
             enemyHitSpawn = collision.transform.position;
             SpawnHurtEffect(transform.position);
-            health -= 8;
-            healthbar.UpdateHealthBar(health, maxHealth);
-
+            health -= 8; healthbar.UpdateHealthBar(health, maxHealth);
             AudioClip[] c2 = { sndStrongHit, sndStrongHit2 };
             audioSrc.PlayOneShot(c2[UnityEngine.Random.Range(0, c2.Length)]);
             AudioClip[] c = { sndHurt, sndHurt2, sndHurt3 };
@@ -2061,15 +2726,11 @@ public class PlayerStep : MonoBehaviour
             float dir = sprite.flipX ? 1f : -1f;
             float dY = collision.transform.position.y > transform.position.y ? -0.7f : 1f;
             rb.velocity = new Vector2(dir * 2f, 5f * dY);
-            anim.speed = 1f;
-            combo = 0;
-            pState = PlayerState.hurt;
+            anim.speed = 1f; combo = 0; pState = PlayerState.hurt;
             anim.SetInteger("mstate", (int)MovementState.launched);
             enemyHitSpawn = collision.transform.position;
             SpawnHurtEffect(transform.position);
-            health -= 8;
-            healthbar.UpdateHealthBar(health, maxHealth);
-
+            health -= 8; healthbar.UpdateHealthBar(health, maxHealth);
             AudioClip[] c2 = { sndStrongHit, sndStrongHit2 };
             audioSrc.PlayOneShot(c2[UnityEngine.Random.Range(0, c2.Length)]);
             AudioClip[] c = { sndHurt, sndHurt2, sndHurt3 };
@@ -2087,43 +2748,15 @@ public class PlayerStep : MonoBehaviour
             float dir = sprite.flipX ? 1f : -1f;
             float dY = collision.transform.position.y > transform.position.y ? -0.7f : 1f;
             rb.velocity = new Vector2(dir * 2f, 5f * dY);
-            anim.speed = 1f;
-            combo = 0;
-            pState = PlayerState.hurt;
+            anim.speed = 1f; combo = 0; pState = PlayerState.hurt;
             anim.SetInteger("mstate", (int)MovementState.launched);
             enemyHitSpawn = collision.transform.position;
             SpawnHurtEffect(transform.position);
-            health -= 3;
-            healthbar.UpdateHealthBar(health, maxHealth);
-
+            health -= 3; healthbar.UpdateHealthBar(health, maxHealth);
             AudioClip[] c2 = { sndStrongHit, sndStrongHit2 };
             audioSrc.PlayOneShot(c2[UnityEngine.Random.Range(0, c2.Length)]);
             AudioClip[] c = { sndHurt, sndHurt2, sndHurt3 };
             audioSrc.PlayOneShot(c[UnityEngine.Random.Range(0, c.Length)]);
         }
-    }
-
-    void OnCollisionEnter2D(Collision2D collision)
-    {
-        if (collision.gameObject.CompareTag("Barrier"))
-        {
-            float dx = collision.transform.position.x - transform.position.x;
-            barrierContactDir = dx > 0 ? 1 : -1;
-        }
-    }
-
-    void OnCollisionStay2D(Collision2D collision)
-    {
-        if (collision.gameObject.CompareTag("Barrier"))
-        {
-            float dx = collision.transform.position.x - transform.position.x;
-            barrierContactDir = dx > 0 ? 1 : -1;
-            rb.gravityScale = 1f;
-        }
-    }
-
-    void OnCollisionExit2D(Collision2D collision)
-    {
-        if (collision.gameObject.CompareTag("Barrier")) barrierContactDir = 0;
     }
 }

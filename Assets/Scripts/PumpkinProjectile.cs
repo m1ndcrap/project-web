@@ -125,12 +125,6 @@ public class PumpkinProjectile : MonoBehaviour
             float dir = 0;
             dir = (transform.position.x < player.transform.position.x) ? 1f : -1f;
 
-            /*
-            if (airborne)
-                dir = (transform.position.x < player.transform.position.x) ? 1f : -1f;
-            else
-                dir = (xstart > targX) ? -1 : 1;*/
-
             player.rb.velocity = new Vector2(dir * 2f, 5f);
             player.anim.speed = 1f;
             player.combo = 0;

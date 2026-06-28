@@ -11,6 +11,11 @@ public class SpriteScript : MonoBehaviour
         player.HitEvent();
     }
 
+    public void SwingKickHitEvent()
+    {
+        player.SwingKickHitEvent();
+    }
+
     public void PauseBeforeHit()
     {
         player.PauseBeforeHit();

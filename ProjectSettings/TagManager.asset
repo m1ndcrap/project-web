@@ -45,7 +45,7 @@ TagManager:
   - Wires
   - CarTrigger
   - ExtraSwingPoints
-  - 
+  - CornerMarker
   - 
   - 
   - 
@@ -75,6 +75,9 @@ TagManager:
   - name: map
     uniqueID: 1773312329
     locked: 0
+  - name: ground
+    uniqueID: 2373178057
+    locked: 0
   - name: Default
     uniqueID: 0
     locked: 0
@@ -83,7 +86,4 @@ TagManager:
     locked: 0
   - name: Enemy
     uniqueID: 2559337361
-    locked: 0
-  - name: ground
-    uniqueID: 2373178057
     locked: 0

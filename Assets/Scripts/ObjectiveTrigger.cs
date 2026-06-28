@@ -73,6 +73,8 @@ public class ObjectiveTrigger : MonoBehaviour
     [SerializeField] private ShockerStep chaseTarget;
     public bool chasing = true;
 
+    public bool intensityThree = false;
+
     void Start()
     {
         player = FindObjectOfType<PlayerStep>();
@@ -167,8 +169,7 @@ public class ObjectiveTrigger : MonoBehaviour
             {
                 if (timerIndex >= 31)
                 {
-                    if (missionType == 4 && missionObjective != null &&
-                        missionObjective.GetComponent<ExplosiveScript>().phase == 0)
+                    if (missionType == 4 && missionObjective != null && missionObjective.GetComponent<ExplosiveScript>().phase == 0)
                     {
                         Debug.Log("failed");
                         timerFailed = true;
@@ -360,7 +361,7 @@ public class ObjectiveTrigger : MonoBehaviour
                 {
                     found = true;
                     uiArrow.canvasRenderer.SetAlpha(0);
-                    uiFound.canvasRenderer.SetAlpha(1);
+                    uiFound.canvasRenderer.SetAlpha(0);
                 }
                 else
                 {
@@ -450,7 +451,12 @@ public class ObjectiveTrigger : MonoBehaviour
             if ((chaseTarget.GetComponent<ShockerStep>().sState != ShockerStep.ShockerState.chase) || !chasing)
             {
                 countdown = false;
-                bgmController.GetComponent<BGMController>().intensity = 0;
+
+                if (!intensityThree)
+                    bgmController.GetComponent<BGMController>().intensity = 0;
+                else
+                    bgmController.GetComponent<BGMController>().intensity = 2;
+
                 completed = true;
                 timerActive = false;
                 uiStart.canvasRenderer.SetAlpha(0);
@@ -526,6 +532,7 @@ public class ObjectiveTrigger : MonoBehaviour
 
         if (cameraPanning && missionType == 4 && missionObjective != null)
         {
+            player.stopMove = true;
             panProgress += Time.deltaTime / panDuration;
 
             if (panProgress >= 1f)

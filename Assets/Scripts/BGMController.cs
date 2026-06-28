@@ -34,7 +34,7 @@ public class BGMController : MonoBehaviour
 
     private void Update()
     {
-        // If any stopped (Unity can sometimes stop if not enough audio voices)
+        // If any stopped, play them again
         if (!intenseSource.isPlaying)
         {
             lightSource.Play();
@@ -45,24 +45,30 @@ public class BGMController : MonoBehaviour
         switch (intensity)
         {
             case 0:
-                // Light fades up, others fade down
-                lightVol = Mathf.MoveTowards(lightVol, lightVolMax, lightVolMax / 10f * Time.deltaTime * 60f);
-                mediumVol = Mathf.MoveTowards(mediumVol, 0f, mediumVolMax / 10f * Time.deltaTime * 60f);
-                intenseVol = Mathf.MoveTowards(intenseVol, 0f, 0.045f * Time.deltaTime * 60f);
+                {
+                    // Light fades up, others fade down
+                    lightVol = Mathf.MoveTowards(lightVol, lightVolMax, lightVolMax / 10f * Time.deltaTime * 60f);
+                    mediumVol = Mathf.MoveTowards(mediumVol, 0f, mediumVolMax / 10f * Time.deltaTime * 60f);
+                    intenseVol = Mathf.MoveTowards(intenseVol, 0f, 0.045f * Time.deltaTime * 60f);
+                }
                 break;
 
             case 1:
-                // Medium fades up
-                lightVol = Mathf.MoveTowards(lightVol, 0f, lightVolMax / 10f * Time.deltaTime * 60f);
-                mediumVol = Mathf.MoveTowards(mediumVol, mediumVolMax, mediumVolMax / 10f * Time.deltaTime * 60f);
-                intenseVol = Mathf.MoveTowards(intenseVol, 0f, 0.045f * Time.deltaTime * 60f);
+                {
+                    // Medium fades up
+                    lightVol = Mathf.MoveTowards(lightVol, 0f, lightVolMax / 10f * Time.deltaTime * 60f);
+                    mediumVol = Mathf.MoveTowards(mediumVol, mediumVolMax, mediumVolMax / 10f * Time.deltaTime * 60f);
+                    intenseVol = Mathf.MoveTowards(intenseVol, 0f, 0.045f * Time.deltaTime * 60f);
+                }
                 break;
 
             case 2:
-                // Intense fades up
-                lightVol = Mathf.MoveTowards(lightVol, 0f, lightVolMax / 10f * Time.deltaTime * 60f);
-                mediumVol = Mathf.MoveTowards(mediumVol, 0f, mediumVolMax / 10f * Time.deltaTime * 60f);
-                intenseVol = Mathf.MoveTowards(intenseVol, intenseVolMax, 0.045f * Time.deltaTime * 60f);
+                {
+                    // Intense fades up
+                    lightVol = Mathf.MoveTowards(lightVol, 0f, lightVolMax / 10f * Time.deltaTime * 60f);
+                    mediumVol = Mathf.MoveTowards(mediumVol, 0f, mediumVolMax / 10f * Time.deltaTime * 60f);
+                    intenseVol = Mathf.MoveTowards(intenseVol, intenseVolMax, 0.045f * Time.deltaTime * 60f);
+                }
                 break;
         }
 

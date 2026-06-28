@@ -337,7 +337,7 @@ public class MenuPlayer : MonoBehaviour
             }
             else
             {
-                Destroy(seg); // If we exceed the pool, just clean up
+                Destroy(seg);
             }
         }
 

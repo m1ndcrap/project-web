@@ -41,7 +41,9 @@ public class ExplosiveScript : MonoBehaviour
         }
 
         if (alarm1 > 0)
+        {
             alarm1 -= 1;
+        }
         else
         {
             if (phase == 1)
@@ -93,8 +95,7 @@ public class ExplosiveScript : MonoBehaviour
             }
         }
 
-        if (bigExplosion)
-            phase = 4;
+        if (bigExplosion) { phase = 4; }
 
         if (phase == 4)
         {
@@ -121,22 +122,6 @@ public class ExplosiveScript : MonoBehaviour
                 float scaleProgress = Mathf.Clamp01(normalizedTime);
                 float currentScale = 1f + (explosionScaleMultiplier * scaleProgress);
                 explosion.transform.localScale = Vector3.one * currentScale;
-
-                //// Optional: Track frame changes for more granular control
-                //AnimatorClipInfo[] clipInfo = explosionAnimator.GetCurrentAnimatorClipInfo(0);
-                //if (clipInfo.Length > 0)
-                //{
-                //    float clipLength = clipInfo[0].clip.length;
-                //    float frameRate = clipInfo[0].clip.frameRate;
-                //    int currentFrame = Mathf.FloorToInt(normalizedTime * clipLength * frameRate);
-
-                //    if (currentFrame != lastAnimationFrame)
-                //    {
-                //        lastAnimationFrame = currentFrame;
-                //        // Scale increases with each frame
-                //        Debug.Log($"Explosion frame: {currentFrame}, Scale: {currentScale}");
-                //    }
-                //}
             }
         }
     }

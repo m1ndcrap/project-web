@@ -30,8 +30,7 @@ public class FireHydrant : MonoBehaviour
                 anim.Play("FireHydrantActive");
             }
 
-            if (!audioSrc.isPlaying)
-                audioSrc.PlayOneShot(sndHydrantLoop);
+            if (!audioSrc.isPlaying) { audioSrc.PlayOneShot(sndHydrantLoop); }
         }
     }
 

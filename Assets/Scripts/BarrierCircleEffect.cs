@@ -10,6 +10,7 @@ public class BarrierCircleEffect : MonoBehaviour
     void Awake()
     {
         circleRenderer = GetComponent<LineRenderer>();
+
         if (circleRenderer == null) return;
 
         circleRenderer.positionCount = circleSegments + 1;

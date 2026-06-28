@@ -5,7 +5,7 @@ public class CameraController : MonoBehaviour
     [SerializeField] private Transform player;
     public bool followPlayer = true;
     
-    private void Update()
+    private void LateUpdate()
     {
         if (followPlayer)
         {

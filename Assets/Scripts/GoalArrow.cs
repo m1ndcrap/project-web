@@ -17,7 +17,9 @@ public class GoalArrow : MonoBehaviour
         if (phase == 0)
         {
             if (x_off < 10)
+            {
                 x_off += 1;
+            }
             else
             {
                 x_off = 10;
@@ -28,7 +30,9 @@ public class GoalArrow : MonoBehaviour
         if (phase == 1)
         {
             if (x_off > -10)
+            {
                 x_off -= 1;
+            }
             else
             {
                 x_off = -10;

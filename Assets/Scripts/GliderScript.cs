@@ -1,17 +1,11 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class GliderScript : MonoBehaviour
 {
-    public enum GState
-    {
-        Shooting,
-        Throwing,
-        Zooming,
-        GroundFight,
-        AirFight
-    }
+    public enum GState {Shooting, Throwing, Zooming, GroundFight, AirFight}
 
     [SerializeField] public PlayerStep player;
     [SerializeField] public GoblinStep goblin;
@@ -53,7 +47,6 @@ public class GliderScript : MonoBehaviour
     {
         sr = GetComponent<SpriteRenderer>();
         transform.localScale = Vector3.one * 0.45f;
-
         alarm0Timer = 240f;
     }
 
@@ -67,11 +60,168 @@ public class GliderScript : MonoBehaviour
 
         switch (state)
         {
-            case GState.Shooting: Shooting(); break;
-            case GState.Throwing: Throwing(); break;
-            case GState.Zooming: Zooming(); break;
-            case GState.GroundFight: GroundFight(); break;
-            case GState.AirFight: AirFight(); break;
+            case GState.Shooting:
+                {
+                    if (!moving)
+                    {
+                        targetX = player.transform.position.x;
+                        targetY = player.transform.position.y;
+                        int index = Random.Range(0, 2);
+
+                        switch(index)
+                        {
+                            case 0: { transform.position = new Vector2(screenLeft, 7.59f); } break;
+                            case 1: { transform.position = new Vector2(screenRight, 7.59f); } break;
+                        }
+
+                        iniX = transform.position.x;
+                        i = iniX - targetX;
+                        moving = true;
+                    }
+	
+	                if (moving)
+	                {		
+		                if (iniX > screenLeft)
+		                {
+                            sr.flipX = true;
+			
+			                if (transform.position.x > screenLeft)
+			                {
+				                i -= 0.1f;
+                                transform.position += Vector3.right * -0.1f * Time.deltaTime * 60f;
+                            }
+                            else
+                            {
+                                transform.position = new Vector2(screenLeft, transform.position.y);
+				                moving = false;
+			                }
+			
+			                if (transform.position.x - player.transform.position.x > 0 && transform.position.x - player.transform.position.x < 3.73f && !shot)
+			                {
+                                FireBullet(-1f);
+			                }
+
+                            transform.position = new Vector2(transform.position.x, targetY + (0.05f * i * i));
+		                }
+                        else
+                        {
+			                sr.flipX = false;
+			
+			                if (transform.position.x < screenRight)
+                            {
+                                i += 0.1f;
+                                transform.position += Vector3.right * 0.1f * Time.deltaTime * 60f;
+                            }
+                            else
+                            {
+                                transform.position = new Vector2(screenRight, transform.position.y);
+                                moving = false;
+			                }
+
+			                if (player.transform.position.x - transform.position.x > 0 && player.transform.position.x - transform.position.x < 3.73f && !shot)
+			                {
+                                FireBullet(1f);
+                            }
+
+                            transform.position = new Vector2(transform.position.x, targetY + (0.05f * i * i));
+		                }
+	                }
+                }
+                break;
+
+
+            case GState.Throwing:
+                {
+                    moving = false;
+                    float spd = Mathf.Lerp(0, 6, Mathf.Abs(transform.position.x - player.transform.position.x) / 150f);
+
+                    if (Input.GetAxisRaw("Horizontal") != 0f)
+                        xOff = 0.956f;
+                    else
+                        xOff = 4.6f;
+
+                    transform.position = Vector2.MoveTowards(transform.position, new Vector2(player.transform.position.x + (xOff * xOffDir), player.transform.position.y + 1.2f), spd * Time.deltaTime * 60f);
+                    sr.flipX = player.transform.position.x < transform.position.x;
+                }
+                break;
+
+
+            case GState.Zooming:
+                {
+                    float amount = (goblin.gState == GoblinStep.GoblinState.on_glider) ? 0.44f : 0.15f;
+
+                    if (!moving)
+                    {
+                        if (transform.position.x > screenLeft && transform.position.x < screenRight)
+                        {
+                            float target = Mathf.Abs(transform.position.x - screenRight) < Mathf.Abs(transform.position.x - screenLeft) ? screenRight : screenLeft;
+                            transform.position = Vector2.MoveTowards(transform.position, new Vector2(target, transform.position.y), 0.075f * Time.deltaTime * 60f);
+                        }
+                        else
+                        {
+                            int index = Random.Range(0, 2);
+                            switch (index)
+                            {
+                                case 0: { transform.position = new Vector2(screenLeft, player.transform.position.y); } break;
+                                case 1: { transform.position = new Vector2(screenRight, player.transform.position.y); } break;
+                            }
+
+                            player.trigger = true;
+                            player.alarm4 = 60;
+                            moving = true;
+                        }
+                    }
+
+                    if (moving)
+                    {
+                        float dir = transform.position.x > screenLeft ? -1 : 1;
+                        sr.flipX = dir < 0;
+
+                        transform.position += Vector3.right * dir * amount * Time.deltaTime * 60f;
+
+                        if (transform.position.x <= screenLeft || transform.position.x >= screenRight)
+                            moving = false;
+                    }
+                }
+                break;
+
+
+            case GState.GroundFight:
+                {
+                    if (transform.position.x > screenLeft && transform.position.x < screenRight)
+                    {
+                        float target = Mathf.Abs(transform.position.x - screenRight) < Mathf.Abs(transform.position.x - screenLeft) ? screenRight : screenLeft;
+                        transform.position = Vector2.MoveTowards(transform.position, new Vector2(target, transform.position.y), 0.1f * Time.deltaTime * 60f);
+                    }
+                    else
+                    {
+                        moving = true;
+                    }
+                }
+                break;
+
+
+            case GState.AirFight:
+                {
+                    if (goblin.gState != GoblinStep.GoblinState.on_glider && goblin.health > 0)
+                        goblin.gState = GoblinStep.GoblinState.on_glider;
+
+                    sr.flipX = transform.position.x > player.transform.position.x;
+
+                    if (player.GetComponent<PlayerStep>().attacking) return;
+
+                    if (!active || currentPath == null) return;
+
+                    Transform target = currentPath.points[index];
+                    transform.position = Vector2.MoveTowards(transform.position, target.position, speed * Time.deltaTime * 60f);
+
+                    if (Vector2.Distance(transform.position, target.position) < 0.05f)
+                    {
+                        index++;
+                        if (index >= currentPath.points.Length) { index = 0; }
+                    }
+                }
+                break;
         }
     }
 
@@ -110,80 +260,12 @@ public class GliderScript : MonoBehaviour
         float dist = Vector2.Distance(transform.position, player.transform.position);
         ptSpeed = Mathf.Lerp(0.02f, 0.16f, (1f - (dist / 1110f)) * 0.08f);
 
-        bool playerDanger = player.GetComponent<PlayerStep>().attacking; // || (player.GetComponent<PlayerStep>().attacking && Vector3.Distance(player.transform.position, transform.position) <= 5.2f)
+        bool playerDanger = player.GetComponent<PlayerStep>().attacking;
 
-        if (playerDanger) // && !goblin.blocking
+        if (playerDanger)
             SetSpeed(0f);
         else
             SetSpeed(ptSpeed);
-
-        //transform.position = Vector2.MoveTowards(transform.position, player.transform.position, ptSpeed * Time.deltaTime * 60f);
-    }
-
-    void Shooting()
-    {
-        if (!moving)
-        {
-            targetX = player.transform.position.x;
-            targetY = player.transform.position.y;
-            int index = Random.Range(0, 2);
-            switch(index)
-            {
-                case 0: { transform.position = new Vector2(screenLeft, 7.59f); } break;
-                case 1: { transform.position = new Vector2(screenRight, 7.59f); } break;
-            }
-            iniX = transform.position.x;
-            i = iniX - targetX;
-            moving = true;
-        }
-	
-	    if (moving)
-	    {		
-		    if (iniX > screenLeft)
-		    {
-                sr.flipX = true;
-			
-			    if (transform.position.x > screenLeft)
-			    {
-				    i -= 0.1f;
-                    transform.position += Vector3.right * -0.1f * Time.deltaTime * 60f;
-                }
-                else
-                {
-                    transform.position = new Vector2(screenLeft, transform.position.y);
-				    moving = false;
-			    }
-			
-			    if (transform.position.x - player.transform.position.x > 0 && transform.position.x - player.transform.position.x < 3.73f && !shot)
-			    {
-                    FireBullet(-1f);
-			    }
-
-                transform.position = new Vector2(transform.position.x, targetY + (0.05f * i * i));
-		    }
-            else
-            {
-			    sr.flipX = false;
-			
-			    if (transform.position.x < screenRight)
-                {
-                    i += 0.1f;
-                    transform.position += Vector3.right * 0.1f * Time.deltaTime * 60f;
-                }
-                else
-                {
-                    transform.position = new Vector2(screenRight, transform.position.y);
-                    moving = false;
-			    }
-
-			    if (player.transform.position.x - transform.position.x > 0 && player.transform.position.x - transform.position.x < 3.73f && !shot)
-			    {
-                    FireBullet(1f);
-                }
-
-                transform.position = new Vector2(transform.position.x, targetY + (0.05f * i * i));
-		    }
-	    }
     }
 
     void FireBullet(float dir)
@@ -194,93 +276,6 @@ public class GliderScript : MonoBehaviour
         if (index < clips.Length) { sfx.PlayOneShot(clips[index]); }
         alarm1Timer = 15f;
         shot = true;
-    }
-
-    void Throwing()
-    {
-        moving = false;
-        float spd = Mathf.Lerp(0, 6, Mathf.Abs(transform.position.x - player.transform.position.x) / 150f);
-
-        if (Input.GetAxisRaw("Horizontal") != 0f)
-            xOff = 0.956f;
-        else
-            xOff = 4.6f;
-
-        transform.position = Vector2.MoveTowards(transform.position, new Vector2(player.transform.position.x + (xOff * xOffDir), player.transform.position.y + 1.2f), spd * Time.deltaTime * 60f);
-        sr.flipX = player.transform.position.x < transform.position.x;
-    }
-
-    void Zooming()
-    {
-        float amount = (goblin.gState == GoblinStep.GoblinState.on_glider) ? 0.44f : 0.15f;
-
-        if (!moving)
-        {
-            if (transform.position.x > screenLeft && transform.position.x < screenRight)
-            {
-                float target = Mathf.Abs(transform.position.x - screenRight) < Mathf.Abs(transform.position.x - screenLeft) ? screenRight : screenLeft;
-                transform.position = Vector2.MoveTowards(transform.position, new Vector2(target, transform.position.y), 0.075f * Time.deltaTime * 60f);
-            }
-            else
-            {
-                int index = Random.Range(0, 2);
-                switch (index)
-                {
-                    case 0: { transform.position = new Vector2(screenLeft, player.transform.position.y); } break;
-                    case 1: { transform.position = new Vector2(screenRight, player.transform.position.y); } break;
-                }
-
-                player.trigger = true;
-                player.alarm4 = 60;
-                moving = true;
-            }
-        }
-
-        if (moving)
-        {
-            float dir = transform.position.x > screenLeft ? -1 : 1;
-            sr.flipX = dir < 0;
-
-            transform.position += Vector3.right * dir * amount * Time.deltaTime * 60f;
-
-            if (transform.position.x <= screenLeft || transform.position.x >= screenRight)
-                moving = false;
-        }
-    }
-
-    void GroundFight()
-    {
-        if (transform.position.x > screenLeft && transform.position.x < screenRight)
-        {
-            float target = Mathf.Abs(transform.position.x - screenRight) < Mathf.Abs(transform.position.x - screenLeft) ? screenRight : screenLeft;
-            transform.position = Vector2.MoveTowards(transform.position, new Vector2(target, transform.position.y), 0.1f * Time.deltaTime * 60f);
-        }
-        else
-        {
-            moving = true;
-        }
-    }
-
-    void AirFight()
-    {
-        if (goblin.gState != GoblinStep.GoblinState.on_glider && goblin.health > 0)
-            goblin.gState = GoblinStep.GoblinState.on_glider;
-
-        sr.flipX = transform.position.x > player.transform.position.x;
-
-        if (player.GetComponent<PlayerStep>().attacking)
-            return;
-
-        if (!active || currentPath == null) return;
-        Transform target = currentPath.points[index];
-        transform.position = Vector2.MoveTowards(transform.position, target.position, speed * Time.deltaTime * 60f);
-
-        if (Vector2.Distance(transform.position, target.position) < 0.05f)
-        {
-            index++;
-            if (index >= currentPath.points.Length)
-                index = 0;
-        }
     }
 
     void HandleAlarms()

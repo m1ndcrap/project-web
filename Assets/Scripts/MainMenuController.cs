@@ -95,7 +95,7 @@ public class MainMenuController : MonoBehaviour
     IEnumerator MoveCooldown()
     {
         movable = false;
-        yield return new WaitForSeconds(0.15f); // Alarm[1] = 10
+        yield return new WaitForSeconds(0.15f);
         movable = true;
     }
 
@@ -116,7 +116,7 @@ public class MainMenuController : MonoBehaviour
 
     IEnumerator Alarm0()
     {
-        yield return new WaitForSeconds(3.75f); // Alarm[0] = 225
+        yield return new WaitForSeconds(3.75f);
 
         string nextScene = TestScene;
         if (option == 1) nextScene = MainScene;
@@ -128,7 +128,7 @@ public class MainMenuController : MonoBehaviour
 
     IEnumerator Alarm2()
     {
-        yield return new WaitForSeconds(1f); // Alarm[2] = 60
+        yield return new WaitForSeconds(1f);
         player.jumpKey = true;
         yield return new WaitForSeconds(0.03f);
         player.jumpKey = false;
@@ -136,7 +136,7 @@ public class MainMenuController : MonoBehaviour
 
     IEnumerator Alarm3()
     {
-        yield return new WaitForSeconds(1.5f); // Alarm[3] = 90
+        yield return new WaitForSeconds(1.5f);
         player.swingKey = true;
         yield return new WaitForSeconds(0.03f);
         player.swingKey = false;
@@ -144,7 +144,7 @@ public class MainMenuController : MonoBehaviour
 
     IEnumerator Alarm4()
     {
-        yield return new WaitForSeconds(2.15f); // Alarm[4] = 130
+        yield return new WaitForSeconds(2.15f);
         player.swingKeyR = true;
         yield return new WaitForSeconds(0.03f);
         player.swingKeyR = false;
