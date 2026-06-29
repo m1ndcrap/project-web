@@ -1,12 +1,14 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
 using UnityEngine.Tilemaps;
 using UnityEngine.UI;
+using static UnityEngine.Rendering.DebugUI.Table;
 
 public class PlayerStep : MonoBehaviour
 {
@@ -50,6 +52,8 @@ public class PlayerStep : MonoBehaviour
     private int direction;
     private float crawlDir = 0f;
     private bool shoot = false;
+    private float zipFromCrawlGrace = 0f;
+    private Vector2 crawlShootAimDir = Vector2.zero;
 
     // Inner corner system
     private bool hasTurnInner = false;
@@ -356,7 +360,7 @@ public class PlayerStep : MonoBehaviour
 
         UpdateBarrierContact();
 
-        Debug.Log(1 / Time.unscaledDeltaTime);  // FPS Counter
+        // Debug.Log(1 / Time.unscaledDeltaTime);  // FPS Counter
         AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
 
         if (swingEnd && stateInfo.IsName("Player_Swing_End") && stateInfo.normalizedTime >= 1f)
@@ -839,6 +843,13 @@ public class PlayerStep : MonoBehaviour
                         {
                             swingKickTargets = arcEnemies;
                             swingKickTriggered = true;
+
+                            if (!anim.GetCurrentAnimatorStateInfo(0).IsName("Player_Swing_Kick"))
+                            {
+                                AudioClip[] clips = { sndSwipe, sndSwipe2, sndSwipe3 };
+                                audioSrc.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
+                            }
+
                             anim.Play("Player_Swing_Kick", 0, 0f);
                         }
                     }
@@ -1095,6 +1106,141 @@ public class PlayerStep : MonoBehaviour
                             pState = PlayerState.normal;
                         }
                     }
+
+                    // Crawl shoot: hold U to aim a zip from the surface, confirm with space
+                    if (Input.GetKey(KeyCode.U) && !stopMove)
+                    {
+                        rb.velocity = Vector2.zero;
+                        shoot = true;
+
+                        // Build an aim direction in surface-local space
+                        float hRaw = Input.GetAxisRaw("Horizontal");
+                        float vRaw = Input.GetAxisRaw("Vertical");
+
+                        Vector2 surfaceAimDir = ((Vector2)transform.right * hRaw + (Vector2)transform.up * vRaw).normalized;
+                        if (surfaceAimDir == Vector2.zero) surfaceAimDir = transform.up;
+
+
+                        crawlShootAimDir = new Vector2(-vRaw, hRaw).normalized;
+
+                        if (crawlShootAimDir == Vector2.zero)
+                        {
+                            float facingSign = sprite.flipX ? -1f : 1f;
+                            crawlShootAimDir = ((Vector2)transform.up * facingSign).normalized;
+                        }
+
+
+                        // frame selection for the crawl shoot animation based on the logical direction of the input relative to the surface
+                        float logicalH, logicalAway;
+
+                        switch (direction)
+                        {
+                            case 1: logicalH = hRaw; logicalAway = vRaw; break;
+                            case 3: logicalH = hRaw; logicalAway = -vRaw; break;
+                            case 2: logicalH = vRaw; logicalAway = hRaw; break;
+                            case 4: logicalH = vRaw; logicalAway = -hRaw; break;
+                            default: logicalH = hRaw; logicalAway = vRaw; break;
+                        }
+
+                        if (logicalH != 0 && logicalAway == 0) anim.Play("Player_Crawl_Shoot", 0, 0.33f);   // straight horizontal
+                        else if (logicalH != 0 && logicalAway > 0) anim.Play("Player_Crawl_Shoot", 0, 0.66f);   // diagonal away
+                        else if (logicalH == 0 && logicalAway > 0) anim.Play("Player_Crawl_Shoot", 0, 0.99f);   // straight away
+                        else anim.Play("Player_Crawl_Shoot", 0, 0.33f); // fallback
+
+
+                        float maxZipRange = 12f;
+                        RaycastHit2D crawlRayHit = Physics2D.Raycast(rb.position, surfaceAimDir, maxZipRange, jumpableGround);
+
+                        if (crawlRayHit.collider != null && Input.GetKeyDown("space"))
+                        {
+                            Vector2 targetSurfaceAway = crawlRayHit.normal;
+                            int capturedDirection = direction;
+
+
+                            Vector2 playerSurfaceAway;
+
+                            switch (capturedDirection)
+                            {
+                                case 1: playerSurfaceAway = Vector2.up; break; // floor: push up
+                                case 3: playerSurfaceAway = Vector2.up; break; // ceiling: push up (into the ceiling tile, away from room)
+                                case 2: playerSurfaceAway = Vector2.right; break; // left wall: push right
+                                case 4: playerSurfaceAway = Vector2.left; break; // right wall: push left
+                                default: playerSurfaceAway = Vector2.up; break;
+                            }
+
+                            float playerNudgeDist = (capturedDirection == 3) ? 1.0f : 0.5f;
+
+                            moveTarget = crawlRayHit.point + targetSurfaceAway * 0.5f;
+                            coll.size = new Vector2(0.7719507f, 1.863027f);
+                            coll.offset = new Vector2(-0.3766563f, -0.968719f);
+
+                            transform.rotation = Quaternion.identity;
+                            direction = 1;
+
+                            Vector2 zipNudgeDir = (moveTarget.Value - rb.position).normalized;
+                            TeleportRigidbody(rb.position + zipNudgeDir * 0.15f + playerSurfaceAway * playerNudgeDist);
+
+
+                            AudioClip[] clips = { sndSwing, sndSwing2, sndSwing3 };
+                            audioSrc.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
+
+                            shoot = false;
+                            zipFromCrawlGrace = 0.3f;
+                            pState = PlayerState.quickzip;
+                        }
+                    }
+                    else
+                    {
+                        if (shoot)
+                        {
+                            if (Input.GetKeyUp(KeyCode.U) && anim.GetCurrentAnimatorStateInfo(0).IsName("Player_Crawl_Shoot"))
+                            {
+                                float angle = Mathf.Atan2(crawlShootAimDir.y, crawlShootAimDir.x) * Mathf.Rad2Deg;
+                                Quaternion rot = Quaternion.Euler(0f, 0f, angle - 90f);
+
+                                float facingSign = sprite.flipX ? -1f : 1f;
+                                AnimatorStateInfo crawlShootInfo = anim.GetCurrentAnimatorStateInfo(0);
+                                float frame = crawlShootInfo.normalizedTime % 1f;
+                                Vector2 offset = Vector2.zero;
+
+                                if (direction == 1) // floor
+                                {
+                                    if (frame < 0.5f) offset = new Vector2(0.189838f, -0.10983f);
+                                    else if (frame < 0.83f) offset = new Vector2(0.138882f, 0.01717f);
+                                    else offset = new Vector2(-0.027118f, 0.08817f);
+                                }
+                                else if (direction == 2) // left wall
+                                {
+                                    if (frame < 0.5f) offset = new Vector2(-0.10983f, 0.189838f);
+                                    else if (frame < 0.83f) offset = new Vector2(0.01717f, 0.138882f);
+                                    else offset = new Vector2(0.08817f, -0.027118f);
+                                }
+                                else if (direction == 3) // ceiling
+                                {
+                                    if (frame < 0.5f) offset = new Vector2(-0.189838f, 0.10983f);
+                                    else if (frame < 0.83f) offset = new Vector2(-0.138882f, -0.01717f);
+                                    else offset = new Vector2(0.027118f, -0.08817f);
+                                }
+                                else // direction == 4, right wall
+                                {
+                                    if (frame < 0.5f) offset = new Vector2(0.10983f, -0.189838f);
+                                    else if (frame < 0.83f) offset = new Vector2(-0.01717f, -0.138882f);
+                                    else offset = new Vector2(-0.08817f, 0.027118f);
+                                }
+
+                                if (direction == 1 || direction == 3)
+                                    offset.x *= facingSign;
+                                else
+                                    offset.y *= facingSign;
+
+                                Instantiate(webPrefab, new Vector3(transform.position.x + offset.x, transform.position.y + offset.y, transform.position.z), rot);
+
+                                audioSrc.PlayOneShot(sndWebShoot);
+                            }
+
+                            shoot = false;
+                        }
+                    }
                 }
                 break;
 
@@ -1103,11 +1249,14 @@ public class PlayerStep : MonoBehaviour
 
             case PlayerState.quickzip:
                 {
+                    zipFromCrawlGrace -= Time.deltaTime;
+
                     // If the path to the target is blocked by a wall, stop short and start crawling there instead
                     if (moveTarget.HasValue)
                     {
                         Vector2 currentPos = rb.position;
                         Vector2 target = moveTarget.Value;
+
                         Vector2 zipDir = (target - currentPos).normalized;
 
                         RaycastHit2D wallBlock = Physics2D.Raycast(currentPos, zipDir, 0.4f, jumpableGround);
@@ -1196,8 +1345,8 @@ public class PlayerStep : MonoBehaviour
 
                         float dirOff = sprite.flipX ? -1f : 1f;
 
-                        bool nearWall = Physics2D.Raycast(new Vector2(transform.position.x + xOff, transform.position.y), new Vector2(dirOff, 0), 0.5f, jumpableGround);
-                        bool nearCeiling = Physics2D.Raycast(new Vector2(transform.position.x + xOff, transform.position.y), Vector2.up, 0.5f, jumpableGround);
+                        bool nearWall = zipFromCrawlGrace <= 0f && Physics2D.Raycast(new Vector2(transform.position.x + xOff, transform.position.y), new Vector2(dirOff, 0), 0.5f, jumpableGround);
+                        bool nearCeiling = zipFromCrawlGrace <= 0f && Physics2D.Raycast(new Vector2(transform.position.x + xOff, transform.position.y), Vector2.up, 0.5f, jumpableGround);
 
                         if (nearWall && dirOff > 0)
                         {
@@ -1594,13 +1743,6 @@ public class PlayerStep : MonoBehaviour
         }
 
         uppercut = savedUppercut;
-
-        // One swipe sound for the whole kick, regardless of how many enemies got hit
-        if (swingKickTargets.Count > 0)
-        {
-            AudioClip[] clips = { sndSwipe, sndSwipe2, sndSwipe3 };
-            audioSrc.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
-        }
     }
 
     // Resolve which combat target to use (robot, shocker, or boss)
@@ -1742,9 +1884,18 @@ public class PlayerStep : MonoBehaviour
         }
         else if (pState == PlayerState.crawl)
         {
-            mstate = MovementState.crawling;
-            bool crawlPushingIntoBarrier = (barrierContactDir == 1 && crawlDir > 0) || (barrierContactDir == -1 && crawlDir < 0);
-            anim.speed = (Mathf.Abs(crawlDir) > 0 && !crawlPushingIntoBarrier) ? 1f : 0f;
+            if (shoot)
+            {
+                // Freeze on the crawl shoot frame while aiming
+                anim.speed = 0f;
+                mstate = MovementState.crawlshoot;
+            }
+            else
+            {
+                mstate = MovementState.crawling;
+                bool crawlPushingIntoBarrier = (barrierContactDir == 1 && crawlDir > 0) || (barrierContactDir == -1 && crawlDir < 0);
+                anim.speed = (Mathf.Abs(crawlDir) > 0 && !crawlPushingIntoBarrier) ? 1f : 0f;
+            }
         }
         else if (pState == PlayerState.quickzip)
         {

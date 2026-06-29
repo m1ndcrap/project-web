@@ -23,6 +23,7 @@ public class ShootScript : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         anim = GetComponent<Animator>();
         player = FindObjectOfType<PlayerStep>();
+        transform.position = new Vector3(transform.position.x, transform.position.y, player.transform.position.z + 1f);
         Destroy(gameObject, lifeTime);
     }
 
