@@ -26,7 +26,7 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
     public GoblinState gState;
 
     // Sound Files
-    [SerializeField] private AudioSource audioSrc;
+    [SerializeField] public AudioSource audioSrc;
     [SerializeField] private AudioClip sndHit;
     [SerializeField] private AudioClip sndHit2;
     [SerializeField] private AudioClip sndHit3;
@@ -36,9 +36,9 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
     [SerializeField] private AudioClip sndStep2;
     [SerializeField] private AudioClip sndGSpinner1;
     [SerializeField] private AudioClip sndGSpinner2;
-    [SerializeField] private AudioClip sndGLaugh1;
-    [SerializeField] private AudioClip sndGLaugh2;
-    [SerializeField] private AudioClip sndGLaugh3;
+    [SerializeField] public AudioClip sndGLaugh1;
+    [SerializeField] public AudioClip sndGLaugh2;
+    [SerializeField] public AudioClip sndGLaugh3;
     [SerializeField] private AudioClip sndGAction1;
     [SerializeField] private AudioClip sndGAction2;
     [SerializeField] private AudioClip sndGWin1;

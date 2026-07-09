@@ -6,12 +6,9 @@ using UnityEngine;
 public class PumpkinSpinner : MonoBehaviour
 {
     public PlayerStep player;
+    public GoblinStep goblin;
     public Animator animator;
-    public AudioSource audioSource;
     public AudioClip pumpkinBoom;
-    [SerializeField] public AudioClip sndGLaugh1;
-    [SerializeField] public AudioClip sndGLaugh2;
-    [SerializeField] public AudioClip sndGLaugh3;
     float[] attractAcc = new float[2];
     public float hspeed;
     private float vspeed;
@@ -26,6 +23,7 @@ public class PumpkinSpinner : MonoBehaviour
     void Start()
     {
         player = FindObjectOfType<PlayerStep>();
+        goblin = FindObjectOfType<GoblinStep>();
         attractAcc[0] = 0.45f;
         attractAcc[1] = 0.15f;
         xstart = transform.position.x;
@@ -82,7 +80,7 @@ public class PumpkinSpinner : MonoBehaviour
         if (stateInfo.IsName("SpinnerNormal"))
         {
             transform.localScale = Vector3.one * 1.4f;
-            audioSource.PlayOneShot(pumpkinBoom, 1f);
+            AudioSource.PlayClipAtPoint(pumpkinBoom, transform.position, 1f);
             animator.Play("SpinnerBoom");
         }
 
@@ -96,8 +94,8 @@ public class PumpkinSpinner : MonoBehaviour
     {
         if (phase != 0) return;
         phase = 1;
-        AudioClip[] clips = { sndGLaugh1, sndGLaugh2, sndGLaugh3 };
-        audioSource.PlayOneShot(clips[Random.Range(0, clips.Length)]);
+        AudioClip[] clips = { goblin.sndGLaugh1, goblin.sndGLaugh2, goblin.sndGLaugh3 };
+        goblin.audioSrc.PlayOneShot(clips[Random.Range(0, clips.Length)]);
     }
 
     void OnTriggerEnter2D(Collider2D other)
@@ -142,8 +140,8 @@ public class PumpkinSpinner : MonoBehaviour
                 AudioClip[] clips = { player.sndHurt, player.sndHurt2, player.sndHurt3 };
                 player.audioSrc.PlayOneShot(clips[Random.Range(0, clips.Length)]);
 
-                AudioClip[] clips2 = { sndGLaugh1, sndGLaugh2, sndGLaugh3 };
-                audioSource.PlayOneShot(clips2[Random.Range(0, clips2.Length)]);
+                AudioClip[] clips2 = {goblin.sndGLaugh1, goblin.sndGLaugh2, goblin.sndGLaugh3 };
+                goblin.audioSrc.PlayOneShot(clips2[Random.Range(0, clips2.Length)]);
                 TriggerExplosion();
             }
         }

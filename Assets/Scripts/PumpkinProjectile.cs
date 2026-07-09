@@ -8,12 +8,9 @@ using UnityEngine.U2D;
 public class PumpkinProjectile : MonoBehaviour
 {
     public PlayerStep player;
+    private GoblinStep goblin;
     [SerializeField] public Animator animator;
-    [SerializeField] public AudioSource audioSource;
     [SerializeField] public AudioClip pumpkinBoom;
-    [SerializeField] public AudioClip sndGLaugh1;
-    [SerializeField] public AudioClip sndGLaugh2;
-    [SerializeField] public AudioClip sndGLaugh3;
     [SerializeField] public bool airborne = false;
     public int dir = 1;
     float i = 0;
@@ -26,6 +23,7 @@ public class PumpkinProjectile : MonoBehaviour
     void Start()
     {
         player = FindObjectOfType<PlayerStep>();
+        goblin = FindObjectOfType<GoblinStep>();
         xstart = transform.position.x;
         ystart = transform.position.y;
         targX = player.transform.position.x;
@@ -97,7 +95,7 @@ public class PumpkinProjectile : MonoBehaviour
         if (stateInfo.IsName("PumpkinNormal"))
         {
             transform.localScale = Vector3.one * 1.4f;
-            audioSource.PlayOneShot(pumpkinBoom, 1f);
+            AudioSource.PlayClipAtPoint(pumpkinBoom, transform.position, 1f);
             animator.Play("PumpkinBoom");
         }
 
@@ -139,8 +137,8 @@ public class PumpkinProjectile : MonoBehaviour
             AudioClip[] clips = { player.sndHurt, player.sndHurt2, player.sndHurt3 };
             player.audioSrc.PlayOneShot(clips[Random.Range(0, clips.Length)]);
 
-            AudioClip[] clips2 = { sndGLaugh1, sndGLaugh2, sndGLaugh3 };
-            audioSource.PlayOneShot(clips2[Random.Range(0, clips2.Length)]);
+            AudioClip[] clips2 = { goblin.sndGLaugh1, goblin.sndGLaugh2, goblin.sndGLaugh3 };
+            goblin.audioSrc.PlayOneShot(clips2[Random.Range(0, clips2.Length)]);
             TriggerExplosion();
         }
         else if (other.CompareTag("Ground"))

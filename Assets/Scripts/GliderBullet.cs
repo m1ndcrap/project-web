@@ -5,8 +5,6 @@ public class GliderBullet : MonoBehaviour
 {
     private PlayerStep player;
     public SpriteRenderer spriteRenderer;
-    public AudioSource audioSource;
-
     public AudioClip bulletSound;
 
     float direction;
@@ -29,7 +27,7 @@ public class GliderBullet : MonoBehaviour
         direction2 = (player.transform.position - transform.position).normalized;
         float angle = Mathf.Atan2(direction2.y, direction2.x) * Mathf.Rad2Deg;
         transform.rotation = Quaternion.Euler(0, 0, angle);
-        audioSource.PlayOneShot(bulletSound, 1f);
+        AudioSource.PlayClipAtPoint(bulletSound, transform.position, 1f);
         player.trigger = true;
         player.alarm4 = 60;
         circleRenderer.positionCount = circleSegments;

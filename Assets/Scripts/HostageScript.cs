@@ -97,7 +97,7 @@ public class HostageScript : MonoBehaviour
                 anim.Play(civThanksAnim);
                 if (audioSrc.isPlaying && audioSrc.clip == sndHelp) { audioSrc.Stop(); }
                 AudioClip[] clips = { sndThanks1, sndThanks2, sndThanks3, sndThanks4, sndThanks5, sndThanks6, sndThanks7, sndThanks8 };
-                audioSrc.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
+                AudioSource.PlayClipAtPoint(clips[UnityEngine.Random.Range(0, clips.Length)], transform.position, 1f);
                 phase = 2;
             }
         }

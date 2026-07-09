@@ -7,7 +7,6 @@ public class BreakableDoor : MonoBehaviour
     public int phase = 0;
     private bool destroyed = false;
     private Animator anim;
-    private AudioSource audioSrc;
     [SerializeField] private AudioClip sndBreak;
     [SerializeField] private GameObject doorEmpty;
     [SerializeField] private GameObject doorWall;
@@ -18,7 +17,6 @@ public class BreakableDoor : MonoBehaviour
     void Start()
     {
         anim = GetComponent<Animator>();
-        audioSrc = GetComponent<AudioSource>();
     }
 
     void Update()
@@ -40,7 +38,7 @@ public class BreakableDoor : MonoBehaviour
             if (phase == 1)
             {
                 anim.Play(breakAnim);
-                audioSrc.PlayOneShot(sndBreak);
+                AudioSource.PlayClipAtPoint(sndBreak, transform.position, 1f);
                 phase = 2;
             }
         }

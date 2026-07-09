@@ -48,7 +48,6 @@ public class PlayerStep : MonoBehaviour
     [SerializeField] private Transform groundPositionChecker;
     [SerializeField] private Transform wallPositionChecker;
     [SerializeField] private Transform ceilingPositionChecker;
-    private float groundCheckDistance = 0.1f;
     private float wallCheckDistance = 0.1f;
     private float ceilingCheckDistance = 0.1f;
     private float ZaxisAdd;
@@ -1560,13 +1559,6 @@ public class PlayerStep : MonoBehaviour
                                 }
                             }
                         }
-
-                        float xOff = 0f;
-                        float ez = transform.eulerAngles.z;
-                        if (ez >= 225 && ez < 315) xOff = -0.4f;
-                        else if (ez >= 315 || ez < 45) xOff = 0f;
-                        else if (ez >= 45 && ez < 135) xOff = 0.4f;
-                        else xOff = 0f;
 
                         float dirOff = sprite.flipX ? -1f : 1f;
 

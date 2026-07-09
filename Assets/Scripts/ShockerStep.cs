@@ -23,7 +23,7 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
     [SerializeField] private LayerMask playerMask;
 
     public enum MovementState { jump, idle, falling, hurt1, hurt2, sprinting, punch1, punch2, kick, death, shoot1, shoot2 }
-    public enum ShockerState { chase, engaged, attack, getting_hit, death }
+    public enum ShockerState { chase, engaged, attack, getting_hit, evade, death }
     public ShockerState sState;
 
     // Sound Files
@@ -96,11 +96,13 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
     // Chase
     [SerializeField] GameObject trigger;
     [SerializeField] private GameObject chaseTriggerPrefab;
-    private bool chased = true;
     [SerializeField] private int phase = 0;
+    private float evadeTimer = 0f;
+    private float evadeDir = 1f;
+    private bool evadeWillRush = false;
+    private float evadeRushDelay = 0f;
+    private int hitStreak = 0;
     private bool blast = false;
-    private bool moving = false;
-    private int move_dir = 1;
     [SerializeField] private GameObject bgmController;
     [SerializeField] private GameObject barrier1;
     [SerializeField] private GameObject barrier2;
@@ -120,7 +122,7 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
         audioSrc.PlayOneShot(clips[index]);
     }
 
-    public bool IsSolidToPlayer => sState == ShockerState.engaged;
+    public bool IsSolidToPlayer => sState == ShockerState.engaged || sState == ShockerState.evade;
 
     public Collider2D BarrierCollider => coll;
 
@@ -206,21 +208,27 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
 
             if (alarm6 >= 60 && sState == ShockerState.getting_hit)
             {
-                // Fire alarm7 sooner at low health
                 float healthPercent = (float)health / maxHealth;
-                alarm7 = healthPercent < 0.5f ? 112 : 225;
-                startAlarm7 = true;
+                int target = healthPercent < 0.5f ? 112 : 225;
+
+                if (!startAlarm7 || alarm7 > target)
+                {
+                    alarm7 = target;
+                    startAlarm7 = true;
+                }
             }
         }
         else
         {
-            if (sState != ShockerState.death && sState != ShockerState.chase && sState != ShockerState.getting_hit)
+            alarm6 = 275;
+
+            if (sState != ShockerState.death && sState != ShockerState.chase && sState != ShockerState.getting_hit && sState != ShockerState.evade)
             {
                 if (player.pState == PlayerStep.PlayerState.dashenemy || Vector3.Distance(player.transform.position, transform.position) <= 1f)
                 {
                     int hitIndex = UnityEngine.Random.Range(0, 3);
                     MovementState mstate = MovementState.idle;
-                    
+
                     switch (hitIndex)
                     {
                         case 0: { mstate = MovementState.punch1; } break;
@@ -243,7 +251,6 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
 
                 alarm7 = 225;
                 startAlarm7 = true;
-                alarm6 = 275;
             }
         }
 
@@ -616,7 +623,6 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
                             if (distanceFromPlayer < 3f)
                             {
                                 trigger.GetComponent<ObjectiveTrigger>().done = true;
-                                chased = false;
                                 barrier1.SetActive(true);
                                 barrier2.SetActive(true);
                                 audioSrc.PlayOneShot(sndTrap);
@@ -629,31 +635,12 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
                 }
                 break;
 
+
+
+
             case ShockerState.engaged:
                 {
-                    if (blast && !moving)
-                    {
-                        // Move away from the player
-                        move_dir = player.transform.position.x > transform.position.x ? -1 : 1;
-                        moving = true;
-                        blast = false;
-                    }
-
-                    if (moving)
-                    {
-                        dirX = move_dir < 0 ? -4f : 4f;
-
-                        bool hitLeftBound = move_dir < 0 && transform.position.x <= arenaLeftBound;
-                        bool hitRightBound = move_dir > 0 && transform.position.x >= arenaRightBound;
-
-                        if (hitLeftBound || hitRightBound)
-                        {
-                            dirX = 0f;
-                            moving = false;
-                        }
-                    }
-
-                    float shockerVelX = dirX * (moving ? 1f : 2.5f);
+                    float shockerVelX = dirX * 2.5f;
 
                     bool movingTowardPlayer = Mathf.Sign(dirX) == Mathf.Sign(player.transform.position.x - transform.position.x);
                     
@@ -662,51 +649,50 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
 
                     rb.velocity = new Vector2(shockerVelX, rb.velocity.y);
 
-                    // Normal engaged logic
-                    if (!moving)
+                    // Melee attack when player is close
+                    if (distanceFromPlayer <= 0.8f && !player.isEnemyAttacking && Grounded() &&
+                        ((!sprite.flipX && transform.position.x < player.transform.position.x) ||
+                            (sprite.flipX && transform.position.x > player.transform.position.x)) &&
+                        canAttack)
                     {
-                        // Melee attack when player is close
-                        if (distanceFromPlayer <= 0.8f && !player.isEnemyAttacking && Grounded() &&
-                            ((!sprite.flipX && transform.position.x < player.transform.position.x) ||
-                             (sprite.flipX && transform.position.x > player.transform.position.x)) &&
-                            canAttack)
-                        {
-                            sState = ShockerState.attack;
-                            PlayAttackSounds();
-                            rb.gravityScale = 0;
+                        sState = ShockerState.attack;
+                        PlayAttackSounds();
+                        rb.gravityScale = 0;
 
-                            int hitIndex = UnityEngine.Random.Range(0, 2);
-                            MovementState mstate = hitIndex == 0 ? MovementState.punch1 : MovementState.punch2;
-                            anim.speed = 1f;
-                            anim.SetInteger("mstate", (int)mstate);
+                        int hitIndex = UnityEngine.Random.Range(0, 2);
+                        MovementState mstate = hitIndex == 0 ? MovementState.punch1 : MovementState.punch2;
+                        anim.speed = 1f;
+                        anim.SetInteger("mstate", (int)mstate);
 
-                            canAttack = false;
-                            player.isEnemyAttacking = true;
-                        }
+                        canAttack = false;
+                        player.isEnemyAttacking = true;
+                    }
 
-                        // Horizontal tracking toward player, clamped to arena bounds
-                        float xDiff = Math.Abs(transform.position.x - player.transform.position.x);
-                        if (xDiff > 0.572f)
-                            dirX = transform.position.x > player.transform.position.x ? -1f : 1f;
-                        else
-                            dirX = 0f;
 
-                        if (xDiff > 0.572f && transform.position.x < arenaLeftBound) dirX = 1f;
-                        if (xDiff > 0.572f && transform.position.x > arenaRightBound) dirX = -1f;
+                    // Horizontal tracking toward player, clamped to arena bounds
+                    float xDiff = Math.Abs(transform.position.x - player.transform.position.x);
 
-                        // Ranged throw when player is far enough away
-                        if (distanceFromPlayer >= 1.8f && canThrow)
-                        {
-                            throwing = true;
-                            canThrow = false;
+                    if (xDiff > 0.572f)
+                        dirX = transform.position.x > player.transform.position.x ? -1f : 1f;
+                    else
+                        dirX = 0f;
 
-                            int hitIndex = UnityEngine.Random.Range(0, 2);
-                            MovementState mstate = hitIndex == 0 ? MovementState.punch1 : MovementState.punch2;
-                            anim.speed = 1f;
-                            anim.SetInteger("mstate", (int)mstate);
 
-                            if (!startAlarm11) { alarm11 = 5; startAlarm11 = true; }
-                        }
+                    if (xDiff > 0.572f && transform.position.x < arenaLeftBound) dirX = 1f;
+                    if (xDiff > 0.572f && transform.position.x > arenaRightBound) dirX = -1f;
+
+                    // Ranged throw when player is far enough away
+                    if (distanceFromPlayer >= 1.8f && canThrow)
+                    {
+                        throwing = true;
+                        canThrow = false;
+
+                        int hitIndex = UnityEngine.Random.Range(0, 2);
+                        MovementState mstate = hitIndex == 0 ? MovementState.punch1 : MovementState.punch2;
+                        anim.speed = 1f;
+                        anim.SetInteger("mstate", (int)mstate);
+
+                        if (!startAlarm11) { alarm11 = 5; startAlarm11 = true; }
                     }
 
                     // Throw / beam logic
@@ -762,6 +748,9 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
                 }
                 break;
 
+
+
+
             case ShockerState.attack:
                 {
                     rb.velocity = new Vector2(0f, 0f);
@@ -791,23 +780,109 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
                             case 2: alarm4 = 500; break;
                         }
 
-                        sState = ShockerState.engaged;
                         player.isEnemyAttacking = false;
                         anim.speed = 1f;
                         kick = false;
                         rb.gravityScale = 1;
+
+                        if (blast)
+                        {
+                            blast = false;
+                            StartEvasion();
+                        }
+                        else
+                        {
+                            sState = ShockerState.engaged;
+                        }
                     }
                 }
                 break;
+
+
+
 
             case ShockerState.getting_hit:
                 {
                     anim.speed = 1f;
 
                     if ((stateInfo.IsName("ShockerHit1") && stateInfo.normalizedTime >= 1f) || (stateInfo.IsName("ShockerHit2") && stateInfo.normalizedTime >= 1f))
+                    {
                         sState = ShockerState.engaged;
+                        TryForceEvadeAfterHit();
+                    }
                 }
                 break;
+
+
+
+
+            case ShockerState.evade:
+                {
+                    if (evadeTimer > 0f)
+                    {
+                        evadeTimer -= Time.deltaTime;
+
+                        float dashSpeed = 4.5f;
+                        float nextX = transform.position.x + evadeDir * dashSpeed * Time.deltaTime;
+
+                        // Don't dash past the arena bounds
+                        bool hitBound = (evadeDir < 0f && nextX <= arenaLeftBound) || (evadeDir > 0f && nextX >= arenaRightBound);
+
+                        if (hitBound)
+                        {
+                            evadeTimer = 0f;
+                            rb.velocity = new Vector2(0f, rb.velocity.y);
+                            dirX = 0f;
+                        }
+                        else
+                        {
+                            rb.velocity = new Vector2(evadeDir * dashSpeed, rb.velocity.y);
+                            dirX = evadeDir;
+                        }
+                    }
+                    else
+                    {
+                        if (evadeRushDelay > 0f)
+                        {
+                            rb.velocity = new Vector2(0f, rb.velocity.y);
+                            dirX = 0f;
+                            evadeRushDelay -= Time.deltaTime;
+                        }
+                        else
+                        {
+                            if (evadeWillRush && distanceFromPlayer <= 5f)
+                            {
+                                sState = ShockerState.attack;
+                                PlayAttackSounds();
+                                rb.gravityScale = 0;
+
+                                int hitIndex = UnityEngine.Random.Range(0, 2);
+                                MovementState mstate = hitIndex == 0 ? MovementState.punch1 : MovementState.punch2;
+                                anim.speed = 1f;
+                                anim.SetInteger("mstate", (int)mstate);
+
+                                canAttack = false;
+                                player.isEnemyAttacking = true;
+                            }
+                            else
+                            {
+                                sState = ShockerState.engaged;
+                            }
+                        }
+                    }
+
+                    if (!wasGrounded && Grounded() && sState == ShockerState.evade)
+                    {
+                        AudioClip[] clips = { sndLand, sndLand2 };
+                        audioSrc.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
+                    }
+
+                    wasGrounded = Grounded();
+                }
+                break;
+
+
+
 
             case ShockerState.death:
                 {
@@ -836,7 +911,7 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
 
         MovementState mstate = MovementState.idle;
 
-        if (sState == ShockerState.engaged || sState == ShockerState.chase)
+        if (sState == ShockerState.engaged || sState == ShockerState.chase || sState == ShockerState.evade)
         {
             if (threw)
             {
@@ -885,16 +960,22 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
 
         if (mstate == MovementState.sprinting)
         {
-            AnimatorStateInfo si = anim.GetCurrentAnimatorStateInfo(0);
-            float nt = si.normalizedTime % 1f;
+            if (normalizedTime >= 0.35f && normalizedTime <= 0.40f && !hasPlayedStep1)
+            {
+                audioSrc.PlayOneShot(sndStep);
+                hasPlayedStep1 = true;
+            }
+            else if (normalizedTime >= 0.85f && normalizedTime <= 0.90f && !hasPlayedStep2)
+            {
+                audioSrc.PlayOneShot(sndStep);
+                hasPlayedStep2 = true;
+            }
 
-            if (nt >= 0.35f && nt <= 0.40f) audioSrc.PlayOneShot(sndStep2);
-            if (nt >= 0.85f && nt <= 0.90f) audioSrc.PlayOneShot(sndStep);
-        }
-        else
-        {
-            hasPlayedStep1 = false;
-            hasPlayedStep2 = false;
+            if (normalizedTime < 0.05f)
+            {
+                hasPlayedStep1 = false;
+                hasPlayedStep2 = false;
+            }
         }
 
         anim.SetInteger("mstate", (int)mstate);
@@ -905,12 +986,34 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
         return Physics2D.BoxCast(coll.bounds.center, coll.bounds.size, 0f, Vector2.down, 0.1f, jumpableGround);
     }
 
+    private void StartEvasion()
+    {
+        sState = ShockerState.evade;
+        hitStreak = 0;
+
+        evadeDir = (transform.position.x < player.transform.position.x) ? -1f : 1f;
+        evadeTimer = UnityEngine.Random.Range(0.35f, 0.65f);
+
+        evadeWillRush = UnityEngine.Random.Range(0, 2) == 0;
+        evadeRushDelay = evadeWillRush ? UnityEngine.Random.Range(0.2f, 0.5f) : 0f;
+    }
+
+    private void TryForceEvadeAfterHit()
+    {
+        // Guaranteed evade after 2+ hits in a row
+        float evadeChance = hitStreak >= 2 ? 1f : 0.5f;
+
+        if (UnityEngine.Random.value < evadeChance)
+            StartEvasion();
+    }
+
     public void OnPlayerHit(ShockerStep target)
     {
         player.isEnemyAttacking = false;
 
         if (sState == ShockerState.engaged)
         {
+            hitStreak++;
             float dir = 0;
 
             if (!player.sprite.flipX)
@@ -995,22 +1098,5 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
     {
         Vector3 hitPosition = (transform.position + other.transform.position) / 2f;
         GameObject hitFX = Instantiate(hitParticlePrefab, impactPoint, Quaternion.identity);
-    }
-
-    void StartThrowCooldown()
-    {
-        StartCoroutine(ThrowCooldown());
-    }
-
-    IEnumerator ThrowCooldown()
-    {
-        yield return new WaitForSeconds(1f);
-        shootAnim = UnityEngine.Random.Range(0, 2) == 0 ? "ShockerShoot1" : "ShockerShoot2";
-        threw = true;
-    }
-
-    int RandomChoice(params int[] values)
-    {
-        return values[UnityEngine.Random.Range(0, values.Length)];
     }
 }

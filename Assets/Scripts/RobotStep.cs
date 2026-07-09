@@ -71,7 +71,6 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
     private bool backstep = false;
     [SerializeField] private bool breakingWeb = false;
     [SerializeField] private GameObject hitParticlePrefab;
-    private bool isEvading = false;
     private float evadeTimer = 0f;
     private float evadeDir = 1f;
     private bool evadeWillRush = false;
@@ -635,7 +634,6 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
                         else
                         {
                             // Rush into attack or return to alert
-                            isEvading = false;
                             if (evadeWillRush && distanceFromPlayer <= 5f && noHitWall)
                             {
                                 isEngaged = true;
@@ -1017,7 +1015,6 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
                 return false;
         }
 
-        isEvading = true;
         eState = EnemyState.evade;
         isEngaged = false;
         hitStreak = 0;
