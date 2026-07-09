@@ -11,7 +11,7 @@ using UnityEngine.XR;
 using static RobotStep;
 using static Unity.Collections.AllocatorManager;
 
-public class ShockerStep : MonoBehaviour
+public class ShockerStep : MonoBehaviour, IEnemyBarrier
 {
     public Rigidbody2D rb;
     [SerializeField] public Animator anim;
@@ -120,6 +120,18 @@ public class ShockerStep : MonoBehaviour
         audioSrc.PlayOneShot(clips[index]);
     }
 
+    public bool IsSolidToPlayer => sState == ShockerState.engaged;
+
+    public Collider2D BarrierCollider => coll;
+
+    public void NudgeAway(float dir)
+    {
+        Vector2 push = new Vector2(dir, 0f);
+
+        if (Physics2D.Raycast(rb.position, push, 0.15f, jumpableGround).collider == null)
+            rb.position += push * 0.02f;
+    }
+
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -174,11 +186,6 @@ public class ShockerStep : MonoBehaviour
         else { outline.color = Color.black; }
 
         collidedWithPlayer = Physics2D.Raycast(transform.position, transform.right * -dirX, 0.65f, playerMask);
-
-        if (sState == ShockerState.getting_hit || player.pState == PlayerStep.PlayerState.dashenemy || sState == ShockerState.attack || (player.transform.position.y - transform.position.y > 0.015f && Grounded()))
-            Physics2D.IgnoreLayerCollision(LayerMask.NameToLayer("Enemy"), LayerMask.NameToLayer("Player"), true);
-        else
-            Physics2D.IgnoreLayerCollision(LayerMask.NameToLayer("Enemy"), LayerMask.NameToLayer("Player"), false);
 
         AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
 

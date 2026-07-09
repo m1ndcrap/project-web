@@ -10,7 +10,7 @@ using static GliderScript;
 using static RobotStep;
 using static ShockerStep;
 
-public class GoblinStep : MonoBehaviour
+public class GoblinStep : MonoBehaviour, IEnemyBarrier
 {
     public Rigidbody2D rb;
     [SerializeField] public Animator anim;
@@ -100,6 +100,24 @@ public class GoblinStep : MonoBehaviour
     [SerializeField] private GameObject goblinSpinnerPrefab;
     private bool canAttack = true;
 
+    private Vector2 jumpStartPos;
+    private float jumpT = 0f;
+    [SerializeField] private float jumpDuration = 0.8f; // seconds to complete arc
+    [SerializeField] private float jumpArcHeight = 2.5f; // peak height above start/end
+    private bool jumpInitialized = false;
+
+    public bool IsSolidToPlayer => gState == GoblinState.engaged;
+
+    public Collider2D BarrierCollider => coll;
+
+    public void NudgeAway(float dir)
+    {
+        Vector2 push = new Vector2(dir, 0f);
+
+        if (Physics2D.Raycast(rb.position, push, 0.15f, jumpableGround).collider == null)
+            rb.position += push * 0.02f;
+    }
+
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -114,6 +132,9 @@ public class GoblinStep : MonoBehaviour
         sndStrongHit2 = player.sndStrongHit2;
         healthbar = FindObjectOfType<BossHealth>();
         healthbar.UpdateHealthBar(health, maxHealth);
+
+        AudioClip[] clips = { sndIntro, sndIntro2 };
+        audioSrc.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
     }
 
     void Update()
@@ -399,49 +420,45 @@ public class GoblinStep : MonoBehaviour
 
             case GoblinState.jump_to_platform:
                 {
-                    rb.velocity = new Vector2(0f, 0f);
+                    Vector2 targetPos = platDir == -1 ? new Vector2(-9.79f, 4.44f) : new Vector2(-1.73f, 4.44f);
 
-	                if (platDir == -1)
-	                {
-                        sprite.flipX = false;
+                    sprite.flipX = platDir != -1;
+                    rb.gravityScale = 0;
+                    rb.velocity = Vector2.zero;
 
-		                if (Vector2.Distance(transform.position, new Vector2(-9.79f, 4.44f)) > 0.2f)
-		                {
-                            rb.gravityScale = 0;
-                            transform.position = Vector2.MoveTowards(transform.position, new Vector2(-9.79f, 4.44f), 0.1f * Time.deltaTime * 60f);
-		                }
-                        else
-                        {
-                            rb.gravityScale = 1;
-			                gState = GoblinState.engaged;
-		                }
-	                }else{
-                        sprite.flipX = true;
+                    // Initialize jump on first frame of this state
+                    if (!jumpInitialized)
+                    {
+                        jumpStartPos = transform.position;
+                        jumpT = 0f;
+                        jumpInitialized = true;
+                        anim.speed = 1f;
+                    }
 
-		                if (Vector2.Distance(transform.position, new Vector2(-1.73f, 4.44f)) > 0.2f)
-		                {
-                            rb.gravityScale = 0;
-                            transform.position = Vector2.MoveTowards(transform.position, new Vector2(-1.73f, 4.44f), 0.1f * Time.deltaTime * 60f);
-		                }
-                        else
-                        {
-                            rb.gravityScale = 1;
-                            gState = GoblinState.engaged;
-		                }
-	                }
+                    jumpT += Time.deltaTime / jumpDuration;
+                    jumpT = Mathf.Clamp01(jumpT);
 
+                    // Linear X/Y interpolation between start and target
+                    Vector2 linearPos = Vector2.Lerp(jumpStartPos, targetPos, jumpT);
+
+                    // Parabolic arc
+                    float arcOffset = Mathf.Sin(jumpT * Mathf.PI) * jumpArcHeight;
+                    transform.position = new Vector2(linearPos.x, linearPos.y + arcOffset);
+
+                    // Freeze animation at apex mid-arc, resume near landing
                     if (stateInfo.IsName("Goblin_Jump"))
                     {
-                        if (platDir == -1)
-                        {
-                            if (Vector2.Distance(transform.position, new Vector2(-9.79f, 4.44f)) > 1f && stateInfo.normalizedTime >= 0.45f) { anim.speed = 0f; }
-                            else if (Vector2.Distance(transform.position, new Vector2(-9.79f, 4.44f)) <= 1f) { anim.speed = 1f; }
-                        }
-                        else
-                        {
-                            if (Vector2.Distance(transform.position, new Vector2(-1.73f, 4.44f)) > 1f && stateInfo.normalizedTime >= 0.45f) { anim.speed = 0f; }
-                            else if (Vector2.Distance(transform.position, new Vector2(-1.73f, 4.44f)) <= 1f) { anim.speed = 1f; }
-                        }
+                        float distToTarget = Vector2.Distance(transform.position, targetPos);
+                        if (jumpT >= 0.45f && jumpT < 0.85f) { anim.speed = 0f; }
+                        else { anim.speed = 1f; }
+                    }
+
+                    if (jumpT >= 1f)
+                    {
+                        transform.position = targetPos; // snap to exact landing point
+                        rb.gravityScale = 1;
+                        jumpInitialized = false;       // reset for next use
+                        gState = GoblinState.engaged;
                     }
                 }
                 break;

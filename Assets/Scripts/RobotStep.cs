@@ -3,7 +3,7 @@ using Unity.Burst.Intrinsics;
 using UnityEngine;
 using UnityEngine.Events;
 
-public class RobotStep : MonoBehaviour
+public class RobotStep : MonoBehaviour, IEnemyBarrier
 {
     public Rigidbody2D rb;
     [SerializeField] public Animator anim;
@@ -76,9 +76,14 @@ public class RobotStep : MonoBehaviour
     private float evadeDir = 1f;
     private bool evadeWillRush = false;
     private float evadeRushDelay = 0f;
+    private float retargetGraceTimer = 0f;
     public bool isEngaged = true;
     private float launchGraceTimer = 0f;
     public float swingKickHitCooldown = 0f;
+    private int hitStreak = 0;
+    private bool hazardBlockedAlert = false;
+    private bool escapingHazard = false;
+    private float hazardEscapeDir = 1f;
 
     // health bar
     private int health = 25;
@@ -99,6 +104,21 @@ public class RobotStep : MonoBehaviour
     [SerializeField] private GameObject keyPrefab;
 
     private bool hasFallen = false;
+
+    public bool IsSolidToPlayer => eState == EnemyState.normal || eState == EnemyState.shocked || eState == EnemyState.alert || eState == EnemyState.evade;
+
+    public bool IsTargetable => eState != EnemyState.death && !(eState == EnemyState.evade && evadeTimer > 0f) && retargetGraceTimer <= 0f;
+
+    public Collider2D BarrierCollider => coll;
+
+    public void NudgeAway(float dir)
+    {
+        Vector2 push = new Vector2(dir, 0f);
+
+        // Don't nudge an enemy into a wall on the other side of it
+        if (Physics2D.Raycast(rb.position, push, 0.15f, jumpableGround).collider == null)
+            rb.position += push * 0.02f;
+    }
 
     // Start is called before the first frame update
     void Start()
@@ -131,6 +151,11 @@ public class RobotStep : MonoBehaviour
         if (swingKickHitCooldown > 0f)
             swingKickHitCooldown -= Time.deltaTime;
 
+        if (retargetGraceTimer > 0f)
+            retargetGraceTimer -= Time.deltaTime;
+
+        UpdateHazardEscape();
+
         // Outline Shader Color Control
         if (eState == EnemyState.attack) { outline.color = Color.red; }
         else if (player.currentTarget == this) { outline.color = Color.white; }
@@ -141,6 +166,12 @@ public class RobotStep : MonoBehaviour
         AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
         distanceFromPlayer = Vector3.Distance(player.transform.position, transform.position);
         noHitWall = !Physics2D.Raycast(transform.position, (player.transform.position - transform.position).normalized, distanceFromPlayer, jumpableGround);
+
+
+        bool legitZeroAnimSpeed = eState == EnemyState.hurt && stateInfo.IsName("Enemy_Launched") && stateInfo.normalizedTime >= 1f;
+        
+        if (anim.speed == 0f && !legitZeroAnimSpeed)
+            anim.speed = 1f;
 
 
         Vector2 start = transform.position;
@@ -229,7 +260,7 @@ public class RobotStep : MonoBehaviour
         }
         else
         {
-            if (eState == EnemyState.alert)
+            if (eState == EnemyState.alert && !escapingHazard)
             {
                 if (distanceFromPlayer >= 4.5f || !noHitWall) eState = EnemyState.normal;
                 bool canAttack = !player.isEnemyAttacking && Vector3.Distance(player.transform.position, transform.position) <= 2.05f && ((!sprite.flipX && transform.position.x < player.transform.position.x) || (sprite.flipX && transform.position.x > player.transform.position.x)) && noHitWall && noHitHazard;
@@ -238,12 +269,9 @@ public class RobotStep : MonoBehaviour
                 {
                     // 25% chance to evade instead of attacking when the player is in range
                     bool doEvade = Grounded() && UnityEngine.Random.Range(0, 4) == 0;
+                    bool evaded = doEvade && StartEvasion();
 
-                    if (doEvade)
-                    {
-                        StartEvasion();
-                    }
-                    else
+                    if (!evaded)
                     {
                         eState = EnemyState.attack;
                         AudioClip[] clips = { sndAttack, sndAttack2 };
@@ -255,9 +283,27 @@ public class RobotStep : MonoBehaviour
 
                         switch (hitIndex)
                         {
-                            case 0: mstate = MovementState.punch1; anim.speed = 0.6f; break;
-                            case 1: mstate = MovementState.punch2; anim.speed = 0.6f; break;
-                            case 2: mstate = MovementState.kick; kick = true; anim.speed = 1f; break;
+                            case 0:
+                                {
+                                    mstate = MovementState.punch1;
+                                    anim.speed = 0.6f;
+                                }
+                                break;
+
+                            case 1:
+                                {
+                                    mstate = MovementState.punch2;
+                                    anim.speed = 0.6f;
+                                }
+                                break;
+
+                            case 2:
+                                {
+                                    mstate = MovementState.kick;
+                                    kick = true;
+                                    anim.speed = 1f;
+                                }
+                                break;
                         }
 
                         anim.SetInteger("mstate", (int)mstate);
@@ -268,14 +314,12 @@ public class RobotStep : MonoBehaviour
                 {
                     // Reset timer and occasionally evade anyway
                     bool doEvade = Grounded() && UnityEngine.Random.Range(0, 6) == 0;
+                    bool evaded = doEvade && StartEvasion();
 
-                    if (doEvade)
-                    {
-                        StartEvasion();
-                    }
-                    else
+                    if (!evaded)
                     {
                         int hitIndex = UnityEngine.Random.Range(0, 3);
+
                         switch (hitIndex)
                         {
                             case 0: alarm4 = 300; break;
@@ -351,6 +395,21 @@ public class RobotStep : MonoBehaviour
                     if (collidedWithPlayer && movingTowardPlayer && !player.IsPhysicallyPassable())
                         normalVelX = 0f;
 
+                    // Don't walk into hazards or off a ledge during patrol
+                    if (dirX != 0f)
+                    {
+                        float moveDir = Mathf.Sign(dirX);
+                        bool hazardAhead = IsHazardAhead(moveDir, 0.6f, 0.9f);
+                        bool ledgeAhead = !IsGroundAhead(moveDir, coll.bounds.extents.x + 0.3f);
+
+                        if (hazardAhead || ledgeAhead)
+                        {
+                            normalVelX = 0f;
+                            dirX = -dirX;
+                            lastspd = dirX;
+                        }
+                    }
+
                     rb.velocity = new Vector2(normalVelX, rb.velocity.y);
 
                     if ((((Math.Abs(transform.position.x - player.transform.position.x) <= 3f) && ((!sprite.flipX && transform.position.x < player.transform.position.x) || (sprite.flipX && transform.position.x > player.transform.position.x))) || collidedWithPlayer) && !shocked && Grounded() && noHitWall && noHitHazard)
@@ -390,12 +449,17 @@ public class RobotStep : MonoBehaviour
                         {
                             anim.speed = 1f;
                             eState = EnemyState.alert;
+                            TryForceEvadeAfterHit();
                         }
                     }
                     else
                     {
                         anim.speed = 1f;
-                        if ((stateInfo.IsName("Enemy_Hit1") && stateInfo.normalizedTime >= 1f) || (stateInfo.IsName("Enemy_Hit2") && stateInfo.normalizedTime >= 1f)) { eState = EnemyState.alert; }
+                        if ((stateInfo.IsName("Enemy_Hit1") && stateInfo.normalizedTime >= 1f) || (stateInfo.IsName("Enemy_Hit2") && stateInfo.normalizedTime >= 1f))
+                        {
+                            eState = EnemyState.alert;
+                            TryForceEvadeAfterHit();
+                        }
                     }
                 }
                 break;
@@ -468,6 +532,11 @@ public class RobotStep : MonoBehaviour
                     if (collidedWithPlayer && movingTowardPlayer && !player.IsPhysicallyPassable())
                         alertVelX = 0f;
 
+                    // Don't chase or backstep straight into a hazard
+                    hazardBlockedAlert = dirX != 0f && IsHazardAhead(Mathf.Sign(dirX), 0.6f, 0.9f);
+                    if (hazardBlockedAlert)
+                        alertVelX = 0f;
+
                     rb.velocity = new Vector2(alertVelX, rb.velocity.y);
 
                     if (!wasGrounded && Grounded() && eState == EnemyState.alert) // Landing Sound Code
@@ -527,55 +596,109 @@ public class RobotStep : MonoBehaviour
                 }
                 break;
 
+
+
+
             case EnemyState.evade:
                 {
                     if (evadeTimer > 0f)
                     {
-                        evadeTimer -= Time.deltaTime;
-                        // Fast dash away
-                        rb.velocity = new Vector2(evadeDir * hsp * 4.5f, rb.velocity.y);
-                        sprite.flipX = (evadeDir < 0);
-                    }
-                    else if (evadeRushDelay > 0f)
-                    {
-                        // Brief pause before rushing
-                        rb.velocity = new Vector2(0f, rb.velocity.y);
-                        evadeRushDelay -= Time.deltaTime;
-                    }
-                    else
-                    {
-                        // Rush into attack or return to alert
-                        isEvading = false;
-                        if (evadeWillRush && distanceFromPlayer <= 5f && noHitWall)
-                        {
-                            isEngaged = true;
-                            // Jump straight to attack state
-                            eState = EnemyState.attack;
-                            AudioClip[] clips = { sndAttack, sndAttack2 };
-                            int index = UnityEngine.Random.Range(0, clips.Length);
-                            if (index < clips.Length) audioSrc.PlayOneShot(clips[index]);
-                            rb.gravityScale = 0;
+                        bool groundAhead = IsGroundAhead(evadeDir, 0.3f);
 
-                            int hitIndex = UnityEngine.Random.Range(0, 3);
-                            MovementState mstate2 = MovementState.idle;
-                            switch (hitIndex)
-                            {
-                                case 0: { mstate2 = MovementState.punch1; anim.speed = 0.6f; } break;
-                                case 1: { mstate2 = MovementState.punch2; anim.speed = 0.6f; } break;
-                                case 2: { mstate2 = MovementState.kick; kick = true; anim.speed = 1f; } break;
-                            }
-                            anim.SetInteger("mstate", (int)mstate2);
-                            player.isEnemyAttacking = true;
+                        if (!groundAhead)
+                        {
+                            // Stop right here instead of running off the edge
+                            evadeTimer = 0f;
+                            retargetGraceTimer = 0.15f;
+                            rb.velocity = new Vector2(0f, rb.velocity.y);
+                            sprite.flipX = (evadeDir > 0);
                         }
                         else
                         {
-                            isEngaged = true;
-                            eState = EnemyState.alert;
-                            alarm4 = UnityEngine.Random.Range(200, 350);
+                            evadeTimer -= Time.deltaTime;
+
+                            if (evadeTimer <= 0f)
+                                retargetGraceTimer = 0.15f;
+
+                            rb.velocity = new Vector2(evadeDir * hsp * 4.5f, rb.velocity.y);
+                            sprite.flipX = (evadeDir > 0);
+                        }
+                    }
+                    else
+                    {
+                        if (evadeRushDelay > 0f)
+                        {
+                            // Brief pause before rushing
+                            rb.velocity = new Vector2(0f, rb.velocity.y);
+                            evadeRushDelay -= Time.deltaTime;
+                        }
+                        else
+                        {
+                            // Rush into attack or return to alert
+                            isEvading = false;
+                            if (evadeWillRush && distanceFromPlayer <= 5f && noHitWall)
+                            {
+                                isEngaged = true;
+
+                                // Jump straight to attack state
+                                eState = EnemyState.attack;
+                                AudioClip[] clips = { sndAttack, sndAttack2 };
+                                int index = UnityEngine.Random.Range(0, clips.Length);
+                                if (index < clips.Length) audioSrc.PlayOneShot(clips[index]);
+                                rb.gravityScale = 0;
+
+
+                                int hitIndex = UnityEngine.Random.Range(0, 3);
+                                MovementState mstate2 = MovementState.idle;
+
+                                switch (hitIndex)
+                                {
+                                    case 0:
+                                        {
+                                            mstate2 = MovementState.punch1;
+                                            anim.speed = 0.6f;
+                                        }
+                                        break;
+
+
+                                    case 1:
+                                        {
+                                            mstate2 = MovementState.punch2;
+                                            anim.speed = 0.6f;
+                                        }
+                                        break;
+
+
+                                    case 2:
+                                        {
+                                            mstate2 = MovementState.kick;
+                                            kick = true;
+                                            anim.speed = 1f;
+                                        }
+                                        break;
+                                }
+
+                                anim.SetInteger("mstate", (int)mstate2);
+                                player.isEnemyAttacking = true;
+                            }
+                            else
+                            {
+                                isEngaged = true;
+                                eState = EnemyState.alert;
+                                alarm4 = UnityEngine.Random.Range(80, 160);
+                            }
                         }
                     }
                 }
                 break;
+        }
+
+        if (escapingHazard)
+        {
+            float escapeSpeed = hsp * 5f;
+            rb.velocity = new Vector2(hazardEscapeDir * escapeSpeed, rb.velocity.y);
+            dirX = hazardEscapeDir;
+            sprite.flipX = hazardEscapeDir < 0f;
         }
 
         UpdateAnimationState();
@@ -583,7 +706,7 @@ public class RobotStep : MonoBehaviour
 
     private void UpdateAnimationState()
     {
-        if (!((eState == EnemyState.alert && backstep) || (eState == EnemyState.attack)))
+        if (!((eState == EnemyState.alert && backstep) || eState == EnemyState.attack || eState == EnemyState.evade))
         {
             if (dirX > 0f)
                 sprite.flipX = false;
@@ -612,19 +735,34 @@ public class RobotStep : MonoBehaviour
 
         if (eState == EnemyState.evade)
         {
-            bool movingAwayFromPlayer = (evadeDir < 0 && transform.position.x > player.transform.position.x) || (evadeDir > 0 && transform.position.x < player.transform.position.x);
-            anim.SetInteger("mstate", (int)(movingAwayFromPlayer ? MovementState.backstep : MovementState.sprinting));
+            anim.SetInteger("mstate", (int)MovementState.backstep);
             return;
         }
 
         if (eState == EnemyState.alert)
         {
-            if (dirX > 0f)
-                if (backstep) mstate = MovementState.backstep; else mstate = MovementState.sprinting;
-            else if (dirX < 0f)
-                if (backstep) mstate = MovementState.backstep; else mstate = MovementState.sprinting;
-            else
+            if (hazardBlockedAlert)
+            {
                 mstate = MovementState.alertidle;
+            }
+            else if (dirX > 0f)
+            {
+                if (backstep)
+                    mstate = MovementState.backstep;
+                else
+                    mstate = MovementState.sprinting;
+            }
+            else if (dirX < 0f)
+            {
+                if (backstep)
+                    mstate = MovementState.backstep;
+                else
+                    mstate = MovementState.sprinting;
+            }
+            else
+            {
+                mstate = MovementState.alertidle;
+            }
 
             if (rb.velocity.y < -0.1f && !Grounded()) { mstate = MovementState.falling; }
         }
@@ -759,6 +897,7 @@ public class RobotStep : MonoBehaviour
         if (target == this)
         {
             rb.gravityScale = 1;
+            hitStreak++;
             float dir = 0;
 
             if (!player.sprite.flipX)
@@ -864,19 +1003,121 @@ public class RobotStep : MonoBehaviour
         GameObject hitFX = Instantiate(hitParticlePrefab, impactPoint, Quaternion.identity);
     }
 
-    private void StartEvasion()
+    private bool StartEvasion()
     {
+        float dir = (transform.position.x < player.transform.position.x) ? -1f : 1f;
+
+        if (!IsDirectionSafeToEvade(dir))
+        {
+            float altDir = -dir;
+
+            if (IsDirectionSafeToEvade(altDir))
+                dir = altDir;
+            else
+                return false;
+        }
+
         isEvading = true;
         eState = EnemyState.evade;
         isEngaged = false;
+        hitStreak = 0;
 
-        // Dash away from the player
-        evadeDir = (transform.position.x < player.transform.position.x) ? -1f : 1f;
+        player.ReleaseTargetIfCurrent(this);
+
+        evadeDir = dir;
         evadeTimer = UnityEngine.Random.Range(0.35f, 0.65f);
 
-        // 50% chance: after evading, rush back in for an attack
         evadeWillRush = UnityEngine.Random.Range(0, 2) == 0;
         evadeRushDelay = evadeWillRush ? UnityEngine.Random.Range(0.2f, 0.5f) : 0f;
+
+        return true;
+    }
+
+    private void TryForceEvadeAfterHit()
+    {
+        if (!Grounded()) return;
+
+        // Guaranteed evade after 2+ hits in a row
+        float evadeChance = hitStreak >= 2 ? 1f : 0.5f;
+
+        if (UnityEngine.Random.value < evadeChance)
+            StartEvasion();
+    }
+
+    private static readonly string[] HazardTags = { "Wires", "Lightning", "OneHitHazard", "Hydrant" };
+
+    private bool IsHazardTag(Collider2D c)
+    {
+        foreach (var t in HazardTags)
+        {
+            if (c.CompareTag(t)) return true;
+        }
+        return false;
+    }
+
+    private bool IsHazardAhead(float dir, float checkDistance = 2.5f, float heightTolerance = 1f)
+    {
+        Vector2 origin = rb.position;
+        Vector2 boxSize = new Vector2(checkDistance, heightTolerance);
+        Vector2 center = origin + new Vector2(dir * checkDistance * 0.5f, 0f);
+
+        Collider2D[] hits = Physics2D.OverlapBoxAll(center, boxSize, 0f);
+
+        foreach (var hit in hits)
+        {
+            if (IsHazardTag(hit))
+                return true;
+        }
+
+        return false;
+    }
+
+    // Finds a hazard collider the robot is currently standing inside of, regardless of whether it's actively "alert" right now
+    private Collider2D GetOverlappingHazard()
+    {
+        Collider2D[] hits = Physics2D.OverlapBoxAll(coll.bounds.center, coll.bounds.size, 0f);
+
+        foreach (var hit in hits)
+        {
+            if (IsHazardTag(hit))
+                return hit;
+        }
+
+        return null;
+    }
+
+    private void UpdateHazardEscape()
+    {
+        if (eState == EnemyState.death || eState == EnemyState.webbed || eState == EnemyState.hurt || eState == EnemyState.attack)
+        {
+            escapingHazard = false;
+            return;
+        }
+
+        Collider2D hazard = GetOverlappingHazard();
+
+        if (hazard == null)
+        {
+            escapingHazard = false;
+            return;
+        }
+
+        escapingHazard = true;
+        hazardEscapeDir = transform.position.x >= hazard.bounds.center.x ? 1f : -1f;
+    }
+
+    // True if the ground continues at least aheadDist in front of the robot in the given direction
+    private bool IsGroundAhead(float dir, float aheadDist, float castDist = 1f)
+    {
+        Vector2 probeOrigin = new Vector2(rb.position.x + dir * aheadDist, coll.bounds.min.y + 0.05f);
+        return Physics2D.Raycast(probeOrigin, Vector2.down, castDist, jumpableGround).collider != null;
+    }
+
+    private bool IsDirectionSafeToEvade(float dir)
+    {
+        if (IsHazardAhead(dir)) return false;
+        if (!IsGroundAhead(dir, 3f)) return false;
+        return true;
     }
 
     private void OnTriggerStay2D(Collider2D collision)
