@@ -191,6 +191,11 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
 
         AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
 
+        bool legitZeroAnimSpeed = sState == ShockerState.death && stateInfo.normalizedTime >= 0.99f;
+
+        if (anim.speed == 0f && !legitZeroAnimSpeed)
+            anim.speed = 1f;
+
         if (sState != ShockerState.engaged) { throwing = false; }
 
         Vector2 start = transform.position;
@@ -898,7 +903,7 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
 
     private void UpdateAnimationState()
     {
-        if (sState != ShockerState.attack)
+        if (sState != ShockerState.attack && sState != ShockerState.evade)
         {
             if (dirX > 0f)
                 sprite.flipX = false;
@@ -909,9 +914,48 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
         if (sState == ShockerState.getting_hit) return;
         if (sState == ShockerState.attack) return;
 
+        if (sState == ShockerState.evade)
+        {
+            if (dirX != 0f)
+                sprite.flipX = dirX < 0f;
+
+            AnimatorStateInfo evadeStateInfo = anim.GetCurrentAnimatorStateInfo(0);
+            float evadeNt = evadeStateInfo.normalizedTime % 1f;
+
+            MovementState evadeMstate = dirX != 0f ? MovementState.sprinting : MovementState.idle;
+
+            if (evadeMstate == MovementState.sprinting)
+            {
+                if (evadeNt >= 0.35f && evadeNt <= 0.40f && !hasPlayedStep1)
+                {
+                    audioSrc.PlayOneShot(sndStep);
+                    hasPlayedStep1 = true;
+                }
+                else if (evadeNt >= 0.85f && evadeNt <= 0.90f && !hasPlayedStep2)
+                {
+                    audioSrc.PlayOneShot(sndStep2);
+                    hasPlayedStep2 = true;
+                }
+
+                if (evadeNt < 0.05f)
+                {
+                    hasPlayedStep1 = false;
+                    hasPlayedStep2 = false;
+                }
+            }
+            else
+            {
+                hasPlayedStep1 = false;
+                hasPlayedStep2 = false;
+            }
+
+            anim.SetInteger("mstate", (int)evadeMstate);
+            return;
+        }
+
         MovementState mstate = MovementState.idle;
 
-        if (sState == ShockerState.engaged || sState == ShockerState.chase || sState == ShockerState.evade)
+        if (sState == ShockerState.engaged || sState == ShockerState.chase)
         {
             if (threw)
             {

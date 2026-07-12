@@ -157,6 +157,9 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
 
         AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
 
+        bool legitZeroAnimSpeed = (gState == GoblinState.death && stateInfo.normalizedTime >= 0.99f) || (gState == GoblinState.jump_to_platform && jumpT >= 0.45f && jumpT < 0.85f && stateInfo.IsName("Goblin_Jump"));
+        if (anim.speed == 0f && !legitZeroAnimSpeed) { anim.speed = 1f; }
+
         if (glider.state != GState.Throwing && glider.state != GState.AirFight && gState != GoblinState.engaged) { throwing = false; }
         if (glider.state == GState.AirFight && gState != GoblinState.on_glider && health > 0) { canThrow = true; gState = GoblinState.on_glider; }
         if (glider.state == GState.AirFight) { gliderActive = true; } else { gliderActive = false; }

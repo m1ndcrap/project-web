@@ -413,17 +413,7 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
 
                     if ((((Math.Abs(transform.position.x - player.transform.position.x) <= 3f) && ((!sprite.flipX && transform.position.x < player.transform.position.x) || (sprite.flipX && transform.position.x > player.transform.position.x))) || collidedWithPlayer) && !shocked && Grounded() && noHitWall && noHitHazard)
                     {
-                        eState = EnemyState.shocked;
-                        AudioClip[] clips = { sndAlert, sndAlert2, sndAlert3 };
-                        int index = UnityEngine.Random.Range(0, clips.Length);
-                        if (index < clips.Length) { audioSrc.PlayOneShot(clips[index]); }
-                        MovementState mstate = MovementState.shocked;
-                        anim.SetInteger("mstate", (int)mstate);
-                        rb.velocity = new Vector2(0f, rb.velocity.y);
-                        anim.speed = 1f;
-                        shocked = true;
-                        alarm3 = 300;
-                        collidedWithPlayer = false;
+                        TriggerShocked();
                     }
 
                     if (!wasGrounded && Grounded() && eState == EnemyState.normal)
@@ -983,6 +973,32 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
             int index = UnityEngine.Random.Range(0, clips.Length);
             if (index < clips.Length) { audioSrc.PlayOneShot(clips[index]); }
         }
+    }
+
+    private void TriggerShocked()
+    {
+        sprite.flipX = transform.position.x >= player.transform.position.x;
+
+        eState = EnemyState.shocked;
+        AudioClip[] clips = { sndAlert, sndAlert2, sndAlert3 };
+        int index = UnityEngine.Random.Range(0, clips.Length);
+        if (index < clips.Length) { audioSrc.PlayOneShot(clips[index]); }
+        anim.SetInteger("mstate", (int)MovementState.shocked);
+        rb.velocity = new Vector2(0f, rb.velocity.y);
+        anim.speed = 1f;
+        shocked = true;
+        alarm3 = 300;
+        collidedWithPlayer = false;
+    }
+
+    public void NotifyPlayerBlocked()
+    {
+        if (eState != EnemyState.normal) return;
+        if (shocked) return;
+        if (!Grounded()) return;
+        if (!noHitWall || !noHitHazard) return;
+
+        TriggerShocked();
     }
 
     public void AttackEvent()

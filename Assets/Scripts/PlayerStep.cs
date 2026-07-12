@@ -50,7 +50,6 @@ public class PlayerStep : MonoBehaviour
     [SerializeField] private Transform ceilingPositionChecker;
     private float wallCheckDistance = 0.1f;
     private float ceilingCheckDistance = 0.1f;
-    private float ZaxisAdd;
     private int direction;
     private float crawlDir = 0f;
     private bool shoot = false;
@@ -71,16 +70,6 @@ public class PlayerStep : MonoBehaviour
     private bool isTurningLegacy = false;
 
     // Combined flags so the swing and zip code can read/reset turn state as a single value
-    private bool hasTurn
-    {
-        get => hasTurnInner || hasTurnOuter;
-
-        set
-        {
-            hasTurnInner = value;
-            hasTurnOuter = value;
-        }
-    }
     private bool isTurning
     {
         get => isTurningInner || isTurningOuter || isTurningLegacy;
@@ -274,6 +263,7 @@ public class PlayerStep : MonoBehaviour
     private float wireHitCooldown = 0f;
     private bool wireWasActive = false;
     private int barrierContactDir = 0; // -1 is a barrier to the left, 1 is a barrier to the right, 0 is none
+    private Collider2D blockingEnemyCollider = null;
     public bool againstBarrier = false;
     private float lightningHitCooldown = 0f;
     private bool lightningWasActive = false;
@@ -394,6 +384,12 @@ public class PlayerStep : MonoBehaviour
         UpdateBarrierContact();
         UpdateEnemyTopBlock();
 
+        if (blockingEnemyCollider != null)
+        {
+            RobotStep blockedRobot = blockingEnemyCollider.GetComponent<RobotStep>();
+            blockedRobot?.NotifyPlayerBlocked();
+        }
+
         if (senseSoundTimer > 0) senseSoundTimer -= Time.deltaTime;
         if (attackCooldown > 0f) attackCooldown -= Time.deltaTime;
 
@@ -454,11 +450,11 @@ public class PlayerStep : MonoBehaviour
             {
                 if (pState == PlayerState.death)
                 {
-                    #if UNITY_EDITOR
-                        EditorApplication.isPlaying = false;
-                    #else
+#if UNITY_EDITOR
+                    EditorApplication.isPlaying = false;
+#else
                             Application.Quit();
-                    #endif
+#endif
                 }
             }
         }
@@ -962,19 +958,22 @@ public class PlayerStep : MonoBehaviour
                     }
                     else if (nearWall && dirOff > 0)
                     {
-                        hasTurn = false;
+                        hasTurnInner = false;
+                        hasTurnOuter = false;
                         visual.rotation = Quaternion.Euler(0, 0, 0);
                         StartCoroutine(RotateAroundCorner(new Vector3(-0.1f, 0.1f, 0), 90f, 4));
                     }
                     else if (nearWall && dirOff < 0)
                     {
-                        hasTurn = false;
+                        hasTurnInner = false;
+                        hasTurnOuter = false;
                         visual.rotation = Quaternion.Euler(0, 0, 0);
                         StartCoroutine(RotateAroundCorner(new Vector3(0.1f, 0.1f, 0), -90f, 2));
                     }
                     else if (nearCeiling)
                     {
-                        hasTurn = false;
+                        hasTurnInner = false;
+                        hasTurnOuter = false;
                         visual.rotation = Quaternion.Euler(0, 0, 0);
                         StartCoroutine(RotateAroundCorner(new Vector3(0f, 0.15f, 0), 180f, 3));
                     }
@@ -1064,8 +1063,6 @@ public class PlayerStep : MonoBehaviour
 
                             if (crawlDir > 0)
                             {
-                                ZaxisAdd += 90;
-
                                 switch (direction)
                                 {
                                     case 1: StartCoroutine(RotateAroundCornerInner(new Vector3(-0.1f, 0.1f, 0), 90f, 4)); break;
@@ -1076,8 +1073,6 @@ public class PlayerStep : MonoBehaviour
                             }
                             else
                             {
-                                ZaxisAdd -= 90;
-
                                 switch (direction)
                                 {
                                     case 1: StartCoroutine(RotateAroundCornerInner(new Vector3(0.1f, 0.1f, 0), -90f, 2)); break;
@@ -1584,7 +1579,8 @@ public class PlayerStep : MonoBehaviour
 
                             if (surfHit.collider != null)
                             {
-                                hasTurn = false;
+                                hasTurnInner = false;
+                                hasTurnOuter = false;
                                 freezeRotation = true;
                                 float surfaceAngle = Mathf.Atan2(surfHit.normal.y, surfHit.normal.x) * Mathf.Rad2Deg;
                                 transform.rotation = Quaternion.Euler(0f, 0f, surfaceAngle - 90f);
@@ -2587,17 +2583,20 @@ public class PlayerStep : MonoBehaviour
         }
         else if (nearWall && dirX > 0)
         {
-            hasTurn = false;
+            hasTurnInner = false;
+            hasTurnOuter = false;
             StartCoroutine(RotateAroundCorner(new Vector3(-0.1f, 0.1f, 0), 90f, 4));
         }
         else if (nearWall && dirX < 0)
         {
-            hasTurn = false;
+            hasTurnInner = false;
+            hasTurnOuter = false;
             StartCoroutine(RotateAroundCorner(new Vector3(0.1f, 0.1f, 0), -90f, 2));
         }
         else if (nearCeiling)
         {
-            hasTurn = false;
+            hasTurnInner = false;
+            hasTurnOuter = false;
             StartCoroutine(RotateAroundCorner(new Vector3(0f, 0.15f, 0), 180f, 3));
         }
 
@@ -3015,6 +3014,7 @@ public class PlayerStep : MonoBehaviour
         Collider2D[] hits = Physics2D.OverlapBoxAll(b.center, probeSize, 0f);
 
         barrierContactDir = 0;
+        blockingEnemyCollider = null;
 
         foreach (var hit in hits)
         {
@@ -3037,14 +3037,20 @@ public class PlayerStep : MonoBehaviour
             RaycastHit2D rHit = Physics2D.BoxCast(b.center, castSize, 0f, Vector2.right, castDist, enemyMask);
 
             if (rHit.collider != null && IsEnemySolid(rHit.collider))
+            {
                 barrierContactDir = 1;
+                blockingEnemyCollider = rHit.collider;
+            }
 
             if (barrierContactDir == 0)
             {
                 RaycastHit2D lHit = Physics2D.BoxCast(b.center, castSize, 0f, Vector2.left, castDist, enemyMask);
 
                 if (lHit.collider != null && IsEnemySolid(lHit.collider))
+                {
                     barrierContactDir = -1;
+                    blockingEnemyCollider = lHit.collider;
+                }
             }
         }
     }
@@ -3304,12 +3310,12 @@ public class PlayerStep : MonoBehaviour
 
             if (wireIsActive && !lightningWasActive)
                 lightningHitCooldown = 0f;
-            
+
             lightningWasActive = wireIsActive;
-            
+
             if (!wireIsActive)
                 return;
-            
+
             if (lightningHitCooldown > 0f)
             {
                 lightningHitCooldown -= Time.deltaTime;
