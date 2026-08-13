@@ -45,7 +45,7 @@ public class MenuPlayer : MonoBehaviour
     public enum PlayerState { normal, swing, crawl, quickzip, dashenemy, hurt, death }
     public PlayerState pState;
 
-    // Sound Files
+    // Sound stuff
     [SerializeField] private AudioSource audioSrc;
     [SerializeField] private AudioClip sndJump;
     [SerializeField] private AudioClip sndJump2;
@@ -64,6 +64,7 @@ public class MenuPlayer : MonoBehaviour
     [SerializeField] private AudioClip sndWebShoot;
     [SerializeField] private AudioClip sndStep;
     [SerializeField] private AudioClip sndStep2;
+    private bool jumpConsumed = false;
 
     private bool wasGrounded = false;
     private int alarm1 = 0;
@@ -119,16 +120,20 @@ public class MenuPlayer : MonoBehaviour
 
                 rb.velocity = new Vector2(dirX * hsp, rb.velocity.y);    // Moving character based on left or right arrow key
 
-                if (jumpKey && Grounded())      // Jump code
-                {
+                if (jumpKey && Grounded() && !jumpConsumed)     // Jump code
+                    {
                     AudioClip[] clips = { sndJump, sndJump2 };
-                    int index = UnityEngine.Random.Range(0, clips.Length + 1); // +1 to include "no sound"
+                    int index = UnityEngine.Random.Range(0, clips.Length + 1);
 
                     if (index < clips.Length)
                         audioSrc.PlayOneShot(clips[index]);
 
                     rb.velocity = new Vector2(rb.velocity.x, jspd);
+                    jumpConsumed = true;
                 }
+
+                if (!jumpKey)
+                    jumpConsumed = false;
 
                 if (swingKey && !Grounded())      // Swing code
                 {

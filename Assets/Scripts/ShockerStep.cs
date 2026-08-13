@@ -134,6 +134,8 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
             rb.position += push * 0.02f;
     }
 
+    [SerializeField] private string titleSceneName = "Title Screen";
+
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -269,11 +271,7 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
             {
                 if (sState == ShockerState.death)
                 {
-                    #if UNITY_EDITOR
-                        EditorApplication.isPlaying = false;
-                    #else
-                        Application.Quit();
-                    #endif
+                    SceneManager.LoadScene(titleSceneName);
                 }
             }
         }
@@ -597,7 +595,6 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
                                 phase = 12;
                                 Destroy(trigger);
                                 trigger = Instantiate(chaseTriggerPrefab, transform.position, Quaternion.identity);
-                                trigger.GetComponent<ObjectiveTrigger>().intensityThree = true;
                                 trigger.transform.localScale = new Vector3(5f, 5f, 1f);
                                 player.trigger = true;
                                 player.alarm4 = 60;
@@ -628,6 +625,7 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
                             if (distanceFromPlayer < 3f)
                             {
                                 trigger.GetComponent<ObjectiveTrigger>().done = true;
+                                trigger.GetComponent<ObjectiveTrigger>().intensityThree = true;
                                 barrier1.SetActive(true);
                                 barrier2.SetActive(true);
                                 audioSrc.PlayOneShot(sndTrap);

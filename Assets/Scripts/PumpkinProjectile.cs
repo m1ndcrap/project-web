@@ -50,14 +50,11 @@ public class PumpkinProjectile : MonoBehaviour
 
         if (airborne)
         {
-            if (i < 10f)
-            {
-                pos.x += 0.1f * dir * Time.deltaTime * 60f;
-                pos.y = ystart - (0.125f * (i * i));
-                i += 0.1f;
+            pos.x += 0.1f * dir * Time.deltaTime * 60f;
+            pos.y = ystart - (0.125f * (i * i));
+            i += 0.1f;
 
-                transform.Rotate(0, 0, -2f * dir);
-            }
+            transform.Rotate(0, 0, -2f * dir);
         }
         else
         {
@@ -67,21 +64,18 @@ public class PumpkinProjectile : MonoBehaviour
                 ready = true;
             }
 
-            if (ready && i < 4.93f)
-            {
-                pos.y = ystart - (0.0025f * (i * i));
-                i += 0.1f;
+            pos.y = ystart - (0.0025f * (i * i));
+            i += 0.1f;
 
-                if (xstart > targX)
-                {
-                    pos.x -= 0.1f * Time.deltaTime * 60f;
-                    transform.Rotate(0, 0, 2f);
-                }
-                else
-                {
-                    pos.x += 0.1f * Time.deltaTime * 60f;
-                    transform.Rotate(0, 0, -2f);
-                }
+            if (xstart > targX)
+            {
+                pos.x -= 0.1f * Time.deltaTime * 60f;
+                transform.Rotate(0, 0, 2f);
+            }
+            else
+            {
+                pos.x += 0.1f * Time.deltaTime * 60f;
+                transform.Rotate(0, 0, -2f);
             }
         }
 
@@ -95,7 +89,7 @@ public class PumpkinProjectile : MonoBehaviour
         if (stateInfo.IsName("PumpkinNormal"))
         {
             transform.localScale = Vector3.one * 1.4f;
-            AudioSource.PlayClipAtPoint(pumpkinBoom, transform.position, 1f);
+            SfxPlayer.Instance.PlayClipAtPointMatched(pumpkinBoom, transform.position);
             animator.Play("PumpkinBoom");
         }
 

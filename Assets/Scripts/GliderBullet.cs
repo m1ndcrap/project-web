@@ -27,7 +27,7 @@ public class GliderBullet : MonoBehaviour
         direction2 = (player.transform.position - transform.position).normalized;
         float angle = Mathf.Atan2(direction2.y, direction2.x) * Mathf.Rad2Deg;
         transform.rotation = Quaternion.Euler(0, 0, angle);
-        AudioSource.PlayClipAtPoint(bulletSound, transform.position, 1f);
+        SfxPlayer.Instance.PlayClipAtPointMatched(bulletSound, transform.position);
         player.trigger = true;
         player.alarm4 = 60;
         circleRenderer.positionCount = circleSegments;

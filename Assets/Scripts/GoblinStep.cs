@@ -44,7 +44,10 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
     [SerializeField] private AudioClip sndGWin1;
     [SerializeField] private AudioClip sndGWin2;
     [SerializeField] private AudioClip sndGWin3;
+
     [SerializeField] private AudioClip sndGCounter;
+    private float counterSoundTimer = 0f;
+
     [SerializeField] private AudioClip sndBlock;
     [SerializeField] private AudioClip sndIntro;
     [SerializeField] private AudioClip sndIntro2;
@@ -82,6 +85,7 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
     private bool hurtOnGlider = false;
     private bool blockOnGlider = false;
     public float swingKickHitCooldown = 0f;
+    private bool counterTriggered = false;
 
     // health bar
     [SerializeField] public int health = 300;
@@ -117,6 +121,8 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
         if (Physics2D.Raycast(rb.position, push, 0.15f, jumpableGround).collider == null)
             rb.position += push * 0.02f;
     }
+
+    [SerializeField] private string titleSceneName = "Title Screen";
 
     void Start()
     {
@@ -169,6 +175,8 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
         Vector2 end = player.transform.position;
         RaycastHit2D[] hits = Physics2D.LinecastAll(start, end);
 
+        if (counterSoundTimer > 0f) { counterSoundTimer -= Time.deltaTime; }
+
         if (alarm4 > 0)
         {
             alarm4 -= 4;
@@ -203,11 +211,7 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
             {
                 if (gState == GoblinState.death)
                 {
-                    #if UNITY_EDITOR
-                        EditorApplication.isPlaying = false;
-                    #else
-                        Application.Quit();
-                    #endif
+                    SceneManager.LoadScene(titleSceneName);
                 }
             }
         }
@@ -220,7 +224,7 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
         {
             if ((glider.state == GState.GroundFight || glider.state == GState.Zooming) && gState != GoblinState.on_glider && gState != GoblinState.death)
             {
-                if (player.pState == PlayerStep.PlayerState.dashenemy && Vector3.Distance(player.transform.position, transform.position) <= 0.4f)
+                if (player.pState == PlayerStep.PlayerState.dashenemy && !counterTriggered && Vector3.Distance(player.transform.position, transform.position) <= 0.4f)
                 {
                     int hitIndex = UnityEngine.Random.Range(0, 2);
                     MovementState mstate = MovementState.idle;
@@ -236,13 +240,21 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
                     dirX = 0;
                     gState = GoblinState.attack;
 
-                    if (!win) { audioSrc.PlayOneShot(sndGCounter); }
+                    if (!win && counterSoundTimer <= 0f)
+                    {
+                        audioSrc.PlayOneShot(sndGCounter);
+                        counterSoundTimer = sndGCounter.length;
+                    }
+
                     player.trigger = true;
                     player.alarm4 = 60;
+                    counterTriggered = true;
                     canAttack = false;
                     rb.gravityScale = 0;
                     player.isEnemyAttacking = true;
                 }
+
+                if (player.pState != PlayerStep.PlayerState.dashenemy) { counterTriggered = false; }
 
                 blocking = false;
             }
@@ -835,11 +847,11 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
         return Physics2D.BoxCast(coll.bounds.center, coll.bounds.size, 0f, Vector2.down, 0.1f, jumpableGround);
     }
 
-    public void OnPlayerHit(GoblinStep target)
+    public void OnPlayerHit(GoblinStep target, bool isCounterHit = false)
     {
         player.isEnemyAttacking = false;
 
-        if (gState == GoblinState.engaged || (gState == GoblinState.on_glider && glider.state == GState.AirFight))
+        if (gState == GoblinState.engaged || gState == GoblinState.attack || (gState == GoblinState.on_glider && glider.state == GState.AirFight))
         {
             float dir = 0;
 
@@ -871,7 +883,7 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
 
             if (gState != GoblinState.on_glider)
             {
-                if (blocking)
+                if (blocking && !isCounterHit)
                 {
                     gState = GoblinState.blocking;
                     mstate = MovementState.blocking;
@@ -934,7 +946,7 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
                     case 2: { alarm11 = 180; startAlarm11 = true; } break;
                 }
 
-                if (blocking)
+                if (blocking && !isCounterHit)
                 {
                     mstate = MovementState.blocking;
                     audioSrc.PlayOneShot(sndBlock);

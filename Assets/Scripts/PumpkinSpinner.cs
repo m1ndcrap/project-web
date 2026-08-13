@@ -80,7 +80,7 @@ public class PumpkinSpinner : MonoBehaviour
         if (stateInfo.IsName("SpinnerNormal"))
         {
             transform.localScale = Vector3.one * 1.4f;
-            AudioSource.PlayClipAtPoint(pumpkinBoom, transform.position, 1f);
+            SfxPlayer.Instance.PlayClipAtPointMatched(pumpkinBoom, transform.position);
             animator.Play("SpinnerBoom");
         }
 

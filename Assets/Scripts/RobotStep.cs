@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Unity.Burst.Intrinsics;
 using UnityEngine;
 using UnityEngine.Events;
@@ -18,9 +19,15 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
     [SerializeField] private int waitTime = 120;
     private Camera cam;
 
+
+
+
     public enum MovementState { idle, running, falling, hurt1, hurt2, launched, shocked, sprinting, alertidle, punch1, punch2, kick, backstep, webbed, death, breakfree }
     public enum EnemyState { normal, death, hurt, shocked, alert, attack, webbed, evade }
     public EnemyState eState;
+
+
+
 
     // Sound Files
     [SerializeField] private AudioSource audioSrc;
@@ -45,6 +52,9 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
     private bool hasPlayedStep1;
     private bool hasPlayedStep2;
 
+
+
+
     // Alarms
     private int alarm1;
     private int alarm2 = 0;
@@ -57,6 +67,9 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
     private bool startAlarm6 = false;
     [SerializeField] private float distanceFromPlayer = 0f;
     public int alarm7 = 0;
+
+
+
 
     // Combat
     private Material outline;
@@ -81,13 +94,35 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
     public float swingKickHitCooldown = 0f;
     private int hitStreak = 0;
     private bool hazardBlockedAlert = false;
+    private bool wallBlockedAlert = false;
     private bool escapingHazard = false;
     private float hazardEscapeDir = 1f;
+
+    private static readonly Dictionary<MovementState, string> HitAnimNames = new Dictionary<MovementState, string>
+    {
+        { MovementState.hurt1, "Enemy_Hit1" },
+        { MovementState.hurt2, "Enemy_Hit2" },
+        { MovementState.launched, "Enemy_Launched" },
+    };
+
+    private void PlayHitAnimation(MovementState state)
+    {
+        anim.SetInteger("mstate", (int)state);
+
+        if (HitAnimNames.TryGetValue(state, out string clipName))
+            anim.Play(clipName, 0, 0f);
+    }
+
+
+
 
     // health bar
     private int health = 25;
     private int maxHealth = 25;
     HealthBar healthbar;
+
+
+
 
     // specialized vars for level objects
     private float wireHitCooldown = 0f;
@@ -96,11 +131,17 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
     private bool lightningWasActive = false;
     private float hitCooldown = 0f;
 
+
+
+
     // mission level specific vars
     [SerializeField] private bool keyGiver = false;
     [SerializeField] private string keyColor = "nothing";
     private bool gaveKey = false;
     [SerializeField] private GameObject keyPrefab;
+
+
+
 
     private bool hasFallen = false;
 
@@ -118,6 +159,9 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
         if (Physics2D.Raycast(rb.position, push, 0.15f, jumpableGround).collider == null)
             rb.position += push * 0.02f;
     }
+
+
+
 
     // Start is called before the first frame update
     void Start()
@@ -514,22 +558,35 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
                         dirX = 0f;
                     }
 
+
                     float alertVelX = dirX * (3f * hsp);
 
-                    bool movingTowardPlayer = Mathf.Sign(dirX) == Mathf.Sign(player.transform.position.x - transform.position.x);
 
-                    if (collidedWithPlayer && movingTowardPlayer && !player.IsPhysicallyPassable())
+                    bool movingTowardPlayer = Mathf.Sign(dirX) == Mathf.Sign(player.transform.position.x - transform.position.x);
+                    bool playerBlocked = collidedWithPlayer && movingTowardPlayer && !player.IsPhysicallyPassable();
+                    bool geometryBlocked = dirX != 0f && IsWallAhead(Mathf.Sign(dirX));
+                    bool ledgeAheadAlert = dirX != 0f && !IsGroundAhead(Mathf.Sign(dirX), coll.bounds.extents.x + 0.3f);
+
+
+                    wallBlockedAlert = playerBlocked || geometryBlocked || ledgeAheadAlert;
+
+                    if (wallBlockedAlert)
                         alertVelX = 0f;
+
 
                     // Don't chase or backstep straight into a hazard
                     hazardBlockedAlert = dirX != 0f && IsHazardAhead(Mathf.Sign(dirX), 0.6f, 0.9f);
+                    
                     if (hazardBlockedAlert)
                         alertVelX = 0f;
 
+
                     rb.velocity = new Vector2(alertVelX, rb.velocity.y);
+
 
                     if (!wasGrounded && Grounded() && eState == EnemyState.alert) // Landing Sound Code
                         audioSrc.PlayOneShot(sndLand);
+
 
                     wasGrounded = Grounded();
                 }
@@ -729,7 +786,7 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
 
         if (eState == EnemyState.alert)
         {
-            if (hazardBlockedAlert)
+            if (hazardBlockedAlert || wallBlockedAlert)
             {
                 mstate = MovementState.alertidle;
             }
@@ -930,7 +987,7 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
             }
             else
             {
-                int hitIndex = UnityEngine.Random.Range(0, 2); // 0 or 1
+                int hitIndex = UnityEngine.Random.Range(0, 2);
 
                 if (hitIndex == 0)
                     mstate = MovementState.hurt1;
@@ -951,7 +1008,7 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
                 }
             }
 
-            anim.SetInteger("mstate", (int)mstate);
+            PlayHitAnimation(mstate);
             Vector2 hitPoint = transform.position;
             player.SpawnHitEffect(hitPoint);
 
@@ -1124,6 +1181,12 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
     {
         Vector2 probeOrigin = new Vector2(rb.position.x + dir * aheadDist, coll.bounds.min.y + 0.05f);
         return Physics2D.Raycast(probeOrigin, Vector2.down, castDist, jumpableGround).collider != null;
+    }
+
+    private bool IsWallAhead(float dir, float checkDistance = 0.4f)
+    {
+        Vector2 origin = rb.position;
+        return Physics2D.Raycast(origin, new Vector2(dir, 0f), checkDistance, jumpableGround).collider != null;
     }
 
     private bool IsDirectionSafeToEvade(float dir)

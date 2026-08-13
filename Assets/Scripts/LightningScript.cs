@@ -6,7 +6,7 @@ public class LightningScript : MonoBehaviour
     public int phase = 0;
     private bool destroyed = false;
     private int alarm1 = 0;
-    private AudioSource audioSrc;
+    public AudioSource audioSrc;
     [SerializeField] private AudioClip sndElectric;
     private Animator anim;
 

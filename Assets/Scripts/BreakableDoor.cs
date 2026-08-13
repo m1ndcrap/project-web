@@ -38,7 +38,7 @@ public class BreakableDoor : MonoBehaviour
             if (phase == 1)
             {
                 anim.Play(breakAnim);
-                AudioSource.PlayClipAtPoint(sndBreak, transform.position, 1f);
+                SfxPlayer.Instance.PlayClipAtPointMatched(sndBreak, transform.position);
                 phase = 2;
             }
         }
