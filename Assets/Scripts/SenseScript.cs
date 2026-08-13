@@ -20,7 +20,7 @@ public class SenseScript : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (player.currentCounter == null || player.pState == PlayerStep.PlayerState.hurt || !player.trigger)
+        if (!player.HasCounterTarget && !player.trigger || player.pState == PlayerStep.PlayerState.hurt)
         {
             Destroy(gameObject);
             return;

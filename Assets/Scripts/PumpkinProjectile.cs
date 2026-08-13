@@ -19,6 +19,7 @@ public class PumpkinProjectile : MonoBehaviour
     float xstart;
     float ystart;
     float targX;
+    float targY;
 
     void Start()
     {
@@ -27,6 +28,7 @@ public class PumpkinProjectile : MonoBehaviour
         xstart = transform.position.x;
         ystart = transform.position.y;
         targX = player.transform.position.x;
+        targY = player.transform.position.y;
         player.trigger = true;
         player.alarm4 = 60;
         transform.rotation = Quaternion.identity;
@@ -64,7 +66,12 @@ public class PumpkinProjectile : MonoBehaviour
                 ready = true;
             }
 
-            pos.y = ystart - (0.0025f * (i * i));
+            float halfSpan = Mathf.Abs(targX - xstart) / 2f;
+            float t = halfSpan > 0f ? Mathf.InverseLerp(-halfSpan, halfSpan, i) : 1f;
+            float baseline = Mathf.Lerp(ystart, targY, t);
+            float arcHeight = Mathf.Max(0.6f, halfSpan * 0.35f);
+
+            pos.y = baseline + arcHeight - (arcHeight / (halfSpan * halfSpan + 0.001f)) * (i * i);
             i += 0.1f;
 
             if (xstart > targX)

@@ -259,6 +259,8 @@ public class PlayerStep : MonoBehaviour
 
     private Component currentCounterTarget = null;
 
+    public bool HasCounterTarget => currentCounterTarget != null;
+
     private Transform CounterTargetTransform => currentCounterTarget switch
     {
         RobotStep r => r.transform,
@@ -528,8 +530,6 @@ public class PlayerStep : MonoBehaviour
                 trigger = false;
         }
 
-        if (senseSoundTimer > 0) senseSoundTimer -= Time.deltaTime;
-
         // Counter detection, look for enemies currently in their attack state
         Vector2 origin = transform.position;
         float closestEDistanceC = Mathf.Infinity;
@@ -587,7 +587,7 @@ public class PlayerStep : MonoBehaviour
 
             spiderSense = true;
         }
-        else if (currentCounterTarget == null || !trigger)
+        else if (!trigger && currentCounterTarget == null)
         {
             spiderSense = false;
         }
@@ -1005,16 +1005,10 @@ public class PlayerStep : MonoBehaviour
                         rb.velocity = new Vector2(rb.velocity.x, jspd);
                         rb.gravityScale = 1;
                         anim.SetInteger("mstate", (int)MovementState.endswing);
-                        coll.size = new Vector2(0.8397379f, 1.615343f);
-                        coll.offset = new Vector2(-0.03511286f, -0.03012538f);
                         audioSrc.PlayOneShot(sndWebRelease);
-                        swingPointSelected = false;
+                        ExitSwing();
                         pState = PlayerState.normal;
                         swingEnd = true;
-                        ReturnAllRopeSegmentsToPool();
-                        swingKickTriggered = false;
-                        swingKickTargets.Clear();
-                        swingKickCooldown = 0f;
                     }
 
                     float dirOff = sprite.flipX ? -1f : 1f;
@@ -1024,23 +1018,16 @@ public class PlayerStep : MonoBehaviour
 
                     if (onGround)
                     {
-                        visual.rotation = Quaternion.Euler(0, 0, 0);
-                        coll.size = new Vector2(0.8397379f, 1.615343f);
-                        coll.offset = new Vector2(-0.03511286f, -0.03012538f);
                         audioSrc.PlayOneShot(sndWebSnap);
-                        swingPointSelected = false;
+                        ExitSwing();
                         pState = PlayerState.normal;
-                        ReturnAllRopeSegmentsToPool();
                         rb.gravityScale = 1;
-                        swingKickTriggered = false;
-                        swingKickTargets.Clear();
-                        swingKickCooldown = 0f;
                     }
                     else if (nearWall && dirOff > 0)
                     {
                         hasTurnInner = false;
                         hasTurnOuter = false;
-                        visual.rotation = Quaternion.Euler(0, 0, 0);
+                        ExitSwing(resetTransformRotation: true);
                         StartCoroutine(RotateAroundCorner(new Vector3(-0.1f, 0.1f, 0), 90f, 4));
                     }
                     else if (nearWall && dirOff < 0)
@@ -2379,6 +2366,7 @@ public class PlayerStep : MonoBehaviour
 
     public void BeginForcedQuickZip(Vector2 target)
     {
+        transform.rotation = Quaternion.identity;
         moveTarget = target;
         zipTravelDist = 0f;
         Vector2 zipNudgeDir = (target - (Vector2)transform.position).normalized;
@@ -2444,6 +2432,22 @@ public class PlayerStep : MonoBehaviour
         }
 
         ropeSegments.Clear();
+    }
+
+    public void ExitSwing(bool resetTransformRotation = true)
+    {
+        visual.rotation = Quaternion.Euler(0f, 0f, 0f);
+
+        if (resetTransformRotation)
+            transform.rotation = Quaternion.identity;
+
+        swingPointSelected = false;
+        ReturnAllRopeSegmentsToPool();
+        swingKickTriggered = false;
+        swingKickTargets.Clear();
+        swingKickCooldown = 0f;
+        coll.size = new Vector2(0.8397379f, 1.615343f);
+        coll.offset = new Vector2(-0.03511286f, -0.03012538f);
     }
 
     private IEnumerator RotateAroundCornerInner(Vector3 positionDelta, float rotationDelta, int newDirection)
@@ -2968,16 +2972,21 @@ public class PlayerStep : MonoBehaviour
 
             if (attacking && landed)
             {
+                bool hitConfirmed = false;
+
                 switch (currentCombatTarget)
                 {
-                    case GoblinStep gb: OnHitG.Invoke(gb); break;
-                    case ShockerStep sh: OnHitS.Invoke(sh); break;
-                    case RobotStep rb2: OnHit.Invoke(rb2); break;
+                    case GoblinStep gb: hitConfirmed = gb.OnPlayerHit(gb); break;
+                    case ShockerStep sh: OnHitS.Invoke(sh); hitConfirmed = true; break;
+                    case RobotStep rb2: OnHit.Invoke(rb2); hitConfirmed = true; break;
                 }
 
-                if (!pastHitEvent) pastHitEvent = true;
-                combo++;
-                alarm3 = 300;
+                if (hitConfirmed)
+                {
+                    if (!pastHitEvent) pastHitEvent = true;
+                    combo++;
+                    alarm3 = 300;
+                }
             }
         }
 

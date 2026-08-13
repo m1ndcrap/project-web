@@ -26,12 +26,9 @@ public class PlayerBossCode : MonoBehaviour
             {
                 myself.rb.velocity = new Vector2(myself.rb.velocity.x, myself.jspd);
                 myself.rb.gravityScale = 1;
-                PlayerStep.MovementState mstate;
-                mstate = PlayerStep.MovementState.endswing;
-                myself.anim.SetInteger("mstate", (int)mstate);
-                myself.coll.size = new Vector2(0.8397379f, 1.615343f);
-                myself.coll.offset = new Vector2(-0.03511286f, -0.03012538f);
+                myself.anim.SetInteger("mstate", (int)PlayerStep.MovementState.endswing);
                 myself.audioSrc.PlayOneShot(myself.sndWebRelease);
+                myself.ExitSwing();
                 myself.pState = PlayerStep.PlayerState.normal;
                 myself.swingEnd = true;
             }

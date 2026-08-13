@@ -31,6 +31,7 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
 
     // Sound Files
     [SerializeField] private AudioSource audioSrc;
+    private AudioSource webAudioSrc;
     [SerializeField] private AudioClip sndAlert;
     [SerializeField] private AudioClip sndAlert2;
     [SerializeField] private AudioClip sndAlert3;
@@ -169,6 +170,20 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
         rb = GetComponent<Rigidbody2D>();
         coll = GetComponent<BoxCollider2D>();
         eState = EnemyState.normal;
+
+        // Duplicate audioSrc's settings onto a new dedicated AudioSource
+        webAudioSrc = gameObject.AddComponent<AudioSource>();
+        webAudioSrc.outputAudioMixerGroup = audioSrc.outputAudioMixerGroup;
+        webAudioSrc.spatialBlend = audioSrc.spatialBlend;
+        webAudioSrc.volume = audioSrc.volume;
+        webAudioSrc.pitch = audioSrc.pitch;
+        webAudioSrc.rolloffMode = audioSrc.rolloffMode;
+        webAudioSrc.minDistance = audioSrc.minDistance;
+        webAudioSrc.maxDistance = audioSrc.maxDistance;
+        webAudioSrc.dopplerLevel = audioSrc.dopplerLevel;
+        webAudioSrc.spread = audioSrc.spread;
+        webAudioSrc.priority = audioSrc.priority;
+
         if (!setCustomStartingDir) { dirX = UnityEngine.Random.Range(0, 2) == 0 ? 1 : -1; }
         alarm1 = waitTime;
         outline = sprite.material;
@@ -382,8 +397,8 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
         {
             if (eState == EnemyState.webbed && !breakingWeb)
             {
-                if (audioSrc.isPlaying && audioSrc.clip == sndWebbedStruggle) { audioSrc.Stop(); }
-                audioSrc.PlayOneShot(sndWebbedEscape);
+                webAudioSrc.Stop();
+                webAudioSrc.PlayOneShot(sndWebbedEscape);
                 anim.SetInteger("mstate", 15);
                 breakingWeb = true;
             }
@@ -414,13 +429,18 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
             {
                 AudioClip[] clips = { sndWebbedStruggle };
                 int index = UnityEngine.Random.Range(0, clips.Length + 1); ;
-                if (index < clips.Length) { audioSrc.PlayOneShot(clips[index]); }
+                if (index < clips.Length) { webAudioSrc.PlayOneShot(clips[index]); }
                 alarm7 = 30;
             }
         }
 
         if (health <= 0)
         {
+            if (eState != EnemyState.death)
+            {
+                webAudioSrc.Stop();
+            }
+
             eState = EnemyState.death;
         }
 
@@ -941,6 +961,11 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
 
         if (target == this)
         {
+            if (eState == EnemyState.webbed)
+            {
+                webAudioSrc.Stop();
+            }
+
             rb.gravityScale = 1;
             hitStreak++;
             float dir = 0;

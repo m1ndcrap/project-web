@@ -166,7 +166,18 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
         bool legitZeroAnimSpeed = (gState == GoblinState.death && stateInfo.normalizedTime >= 0.99f) || (gState == GoblinState.jump_to_platform && jumpT >= 0.45f && jumpT < 0.85f && stateInfo.IsName("Goblin_Jump"));
         if (anim.speed == 0f && !legitZeroAnimSpeed) { anim.speed = 1f; }
 
-        if (glider.state != GState.Throwing && glider.state != GState.AirFight && gState != GoblinState.engaged) { throwing = false; }
+        if (glider.state != GState.Throwing && glider.state != GState.AirFight && gState != GoblinState.engaged)
+        {
+            if (throwing && !threw)
+            {
+                canThrow = true;
+                startAlarm11 = false;
+                spinners = false;
+            }
+
+            throwing = false;
+        }
+
         if (glider.state == GState.AirFight && gState != GoblinState.on_glider && health > 0) { canThrow = true; gState = GoblinState.on_glider; }
         if (glider.state == GState.AirFight) { gliderActive = true; } else { gliderActive = false; }
         if (gliderActive && health == 0) { transform.position = new Vector2(glider.transform.position.x, glider.transform.position.y + 1.86f); rb.velocity = new Vector2(0f, 0f); }
@@ -847,11 +858,11 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
         return Physics2D.BoxCast(coll.bounds.center, coll.bounds.size, 0f, Vector2.down, 0.1f, jumpableGround);
     }
 
-    public void OnPlayerHit(GoblinStep target, bool isCounterHit = false)
+    public bool OnPlayerHit(GoblinStep target, bool isCounterHit = false)
     {
         player.isEnemyAttacking = false;
 
-        if (gState == GoblinState.engaged || gState == GoblinState.attack || (gState == GoblinState.on_glider && glider.state == GState.AirFight))
+        if (gState == GoblinState.engaged || gState == GoblinState.attack || gState == GoblinState.getting_hit || (gState == GoblinState.on_glider && glider.state == GState.AirFight))
         {
             float dir = 0;
 
@@ -883,6 +894,8 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
 
             if (gState != GoblinState.on_glider)
             {
+                rb.gravityScale = 1;
+
                 if (blocking && !isCounterHit)
                 {
                     gState = GoblinState.blocking;
@@ -1009,6 +1022,8 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
             }
 
             anim.SetInteger("mstate", (int)mstate);
+
+            return true;
         }
         else if (gState == GoblinState.on_glider && glider.state != GState.AirFight)
         {
@@ -1027,7 +1042,11 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
             audioSrc.PlayOneShot(sndBlock);
             blockOnGlider = true;
             anim.SetInteger("mstate", (int)mstate);
+
+            return true;
         }
+
+        return false;
     }
 
     public void AttackEvent()

@@ -11,6 +11,7 @@ public class HostageScript : MonoBehaviour
     private bool rescued = false;
     private int alarm1 = 0;
     private int alarm2 = 300;
+    private int alarm3 = 0;
     private SpriteRenderer sr;
     private bool fading = false;
     private float fadeSpeed = 1.5f;
@@ -33,57 +34,48 @@ public class HostageScript : MonoBehaviour
         sr = GetComponent<SpriteRenderer>();
         audioSrc = GetComponent<AudioSource>();
         anim = GetComponent<Animator>();
-    }
 
-    void Update()
-    {
         switch (civ)
         {
             case 1:
                 {
                     civScaredAnim = "Civ1_Scared";
-                    string[] anims = { "Civ1_Thanks1", "Civ1_Thanks2" };
-                    civThanksAnim = anims[UnityEngine.Random.Range(0, anims.Length)];
+                    civThanksAnim = new[] { "Civ1_Thanks1", "Civ1_Thanks2" }[UnityEngine.Random.Range(0, 2)];
                 }
                 break;
-
 
             case 2:
                 {
                     civScaredAnim = "Civ2_Scared";
-                    string[] anims = { "Civ2_Thanks", "Civ2_Thanks2" };
-                    civThanksAnim = anims[UnityEngine.Random.Range(0, anims.Length)];
+                    civThanksAnim = new[] { "Civ2_Thanks", "Civ2_Thanks2" }[UnityEngine.Random.Range(0, 2)];
                 }
                 break;
-
 
             case 3:
                 {
                     civScaredAnim = "Civ3_Scared";
-                    string[] anims = { "Civ3_Thanks1", "Civ3_Thanks2" };
-                    civThanksAnim = anims[UnityEngine.Random.Range(0, anims.Length)];
+                    civThanksAnim = new[] { "Civ3_Thanks1", "Civ3_Thanks2" }[UnityEngine.Random.Range(0, 2)];
                 }
                 break;
-
 
             case 4:
                 {
                     civScaredAnim = "Civ4_Scared";
-                    string[] anims = { "Civ4_Thanks1", "Civ4_Thanks2" };
-                    civThanksAnim = anims[UnityEngine.Random.Range(0, anims.Length)];
+                    civThanksAnim = new[] { "Civ4_Thanks1", "Civ4_Thanks2" }[UnityEngine.Random.Range(0, 2)];
                 }
                 break;
-
 
             case 5:
                 {
                     civScaredAnim = "Civ5_Scared";
-                    string[] anims = { "Civ5_Thanks1", "Civ5_Thanks2" };
-                    civThanksAnim = anims[UnityEngine.Random.Range(0, anims.Length)];
+                    civThanksAnim = new[] { "Civ5_Thanks1", "Civ5_Thanks2" }[UnityEngine.Random.Range(0, 2)];
                 }
                 break;
         }
+    }
 
+    void Update()
+    {
         if (phase == 0) { anim.Play(civScaredAnim); }
 
         if (alarm1 > 0)
@@ -95,16 +87,36 @@ public class HostageScript : MonoBehaviour
             if (phase == 1)
             {
                 anim.Play(civThanksAnim);
-                if (audioSrc.isPlaying && audioSrc.clip == sndHelp) { audioSrc.Stop(); }
                 AudioClip[] clips = { sndThanks1, sndThanks2, sndThanks3, sndThanks4, sndThanks5, sndThanks6, sndThanks7, sndThanks8 };
                 SfxPlayer.Instance.PlayClipAtPointMatched(clips[UnityEngine.Random.Range(0, clips.Length)], transform.position);
+
+                float clipLength = 1f;
+
+                foreach (AnimationClip clip in anim.runtimeAnimatorController.animationClips)
+                {
+                    if (clip.name == civThanksAnim)
+                    {
+                        clipLength = clip.length;
+                        break;
+                    }
+                }
+                alarm3 = Mathf.CeilToInt(clipLength / Time.deltaTime);
+
                 phase = 2;
             }
         }
 
+
         AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
-        if (phase == 2 && stateInfo.IsName(civThanksAnim) && stateInfo.normalizedTime >= 1f)
-            phase = 3;
+
+        if (phase == 2)
+        {
+            if (alarm3 > 0)
+                alarm3 -= 1;
+            else
+                phase = 3;
+        }
+
 
         if (alarm2 > 0)
         {
@@ -118,7 +130,10 @@ public class HostageScript : MonoBehaviour
                 int index = UnityEngine.Random.Range(0, clips.Length + 1);
 
                 if (index < clips.Length)
-                    audioSrc.PlayOneShot(clips[index]);
+                {
+                    audioSrc.clip = clips[index];
+                    audioSrc.Play();
+                }
             }
 
             alarm2 = 300;
@@ -132,7 +147,7 @@ public class HostageScript : MonoBehaviour
                 {
                     if (trigger.GetComponent<RobotStep>().eState == RobotStep.EnemyState.death)
                     {
-                        phase = 1;
+                        RescueHostage();
                     }
                 }
             }
@@ -143,7 +158,7 @@ public class HostageScript : MonoBehaviour
                 {
                     if (trigger.GetComponent<LightningScript>().phase == 3)
                     {
-                        phase = 1;
+                        RescueHostage();
                     }
                 }
             }
@@ -154,16 +169,10 @@ public class HostageScript : MonoBehaviour
                 {
                     if (trigger.GetComponent<BreakableDoor>().phase == 2)
                     {
-                        phase = 1;
+                        RescueHostage();
                     }
                 }
             }
-        }
-
-        if (phase == 1 && !rescued)
-        {
-            alarm1 = 10;
-            rescued = true;
         }
 
         if (phase == 3 && !fading)
@@ -193,8 +202,18 @@ public class HostageScript : MonoBehaviour
         {
             if (collision.gameObject.CompareTag("Player") && phase == 0)
             {
-                phase = 1;
+                RescueHostage();
             }
         }
+    }
+
+    private void RescueHostage()
+    {
+        if (rescued) return;
+
+        rescued = true;
+        audioSrc.Stop();
+        alarm1 = 10;
+        phase = 1;
     }
 }
