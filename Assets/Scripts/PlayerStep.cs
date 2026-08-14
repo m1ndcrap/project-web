@@ -42,6 +42,10 @@ public class PlayerStep : MonoBehaviour
     private const float SwingKickVelocityThreshold = 2.0f;
 
 
+    // Crawl kick variables
+    private bool crawlKickTriggered = false;
+
+
     // Crawling variables
     [SerializeField] private bool groundDetected;
     [SerializeField] private bool wallDetected;
@@ -103,7 +107,7 @@ public class PlayerStep : MonoBehaviour
     private Queue<GameObject> ropeSegmentPool = new Queue<GameObject>();
     private int maxPoolSize = 200;
 
-    public enum MovementState { idle, running, jumping, falling, swinging, endswing, crawling, zip, groundshoot, airshoot, crawlshoot, punch1, punch2, punch3, punch4, airkick, airpunch, kick1, kick2, uppercut, launched, hurt1, hurt2, block1, block2, block3, block4, death, swingkick }
+    public enum MovementState { idle, running, jumping, falling, swinging, endswing, crawling, zip, groundshoot, airshoot, crawlshoot, punch1, punch2, punch3, punch4, airkick, airpunch, kick1, kick2, uppercut, launched, hurt1, hurt2, block1, block2, block3, block4, death, swingkick, crawlkick }
     public enum PlayerState { normal, swing, crawl, quickzip, dashenemy, hurt, death }
     public PlayerState pState;
     private PlayerState _prevPState; // last frame's state, used to detect crawl and quickzip enter/exit
@@ -440,6 +444,10 @@ public class PlayerStep : MonoBehaviour
         // If something forced us out of crawl while a corner turn was mid-flight, the coroutine is still running unsupervised so cancel it
         if (pState != PlayerState.crawl && isTurning)
             CancelActiveTurn();
+
+        // Getting hit while crawl-kicking orphans this flag, which then blocks all future animation updates in UpdateAnimationState()
+        if (pState == PlayerState.hurt && crawlKickTriggered)
+            crawlKickTriggered = false;
 
         UpdateBarrierContact();
         UpdateEnemyTopBlock();
@@ -1070,6 +1078,35 @@ public class PlayerStep : MonoBehaviour
                     swingEnd = false;
                     wasGrounded = true;
                     dirX = Input.GetAxisRaw("Horizontal");
+
+
+                    // Crawl kick: resets itself once the animation finishes
+                    if (crawlKickTriggered)
+                    {
+                        AnimatorStateInfo kickState = anim.GetCurrentAnimatorStateInfo(0);
+                        if (kickState.IsName("Player_Crawl_Kick") && kickState.normalizedTime >= 1f)
+                            crawlKickTriggered = false;
+                    }
+
+                    // Trigger a stationary crawl kick - only usable while crawling, doesn't move/dash
+                    if (!crawlKickTriggered && Input.GetKeyDown(KeyCode.O) && !stopMove && !shoot && attackCooldown <= 0f)
+                    {
+                        crawlKickTriggered = true;
+                        rb.velocity = Vector2.zero;
+                        anim.speed = 1f;
+                        PlayAttackAnimation(MovementState.crawlkick);
+                        attackCooldown = attackCooldownDuration;
+                        PlayAttackSounds();
+                    }
+
+                    // While the kick plays, freeze crawl movement and skip everything else this state normally does
+                    if (crawlKickTriggered)
+                    {
+                        crawlDir = 0f;
+                        rb.velocity = Vector2.zero;
+                        break;
+                    }
+
 
                     float rawInput = (direction == 1 || direction == 3) ? Input.GetAxisRaw("Horizontal") : Input.GetAxisRaw("Vertical");
 
@@ -2212,9 +2249,19 @@ public class PlayerStep : MonoBehaviour
             || (si.IsName("Player_Uppercut") && si.normalizedTime <= 0.33f);
     }
 
+    // Check whether the player is in a state that should break breakable objects
+    private bool CanBreakObjects(AnimatorStateInfo si)
+    {
+        if (pState == PlayerState.dashenemy && IsAttackMoveWindow(si)) return true;
+        if (pState == PlayerState.crawl && crawlKickTriggered && si.IsName("Player_Crawl_Kick")) return true;
+        return false;
+    }
+
     private void UpdateAnimationState()
     {
         if (postAttackBuffer > 0f) postAttackBuffer -= Time.deltaTime;
+
+        if (crawlKickTriggered) return;
 
         if (pState == PlayerState.hurt) return;
 
@@ -2234,6 +2281,9 @@ public class PlayerStep : MonoBehaviour
 
         // Don't override the swing kick animation while it's playing
         if (swingKickTriggered && anim.GetCurrentAnimatorStateInfo(0).IsName("Player_Swing_Kick")) return;
+
+        // Don't override the crawl kick animation while it's playing
+        if (crawlKickTriggered && anim.GetCurrentAnimatorStateInfo(0).IsName("Player_Crawl_Kick")) return;
 
         MovementState mstate = MovementState.idle;
 
@@ -2961,6 +3011,12 @@ public class PlayerStep : MonoBehaviour
     // Called from an animation event on the attack impact frame
     public void HitEvent()
     {
+        if (crawlKickTriggered)
+        {
+            HandleCrawlKickHit();
+            return;
+        }
+
         if (currentCombatTarget == null && !(countering && currentCounterTarget != null)) return;
 
         float groundDist = 0.45f;
@@ -3015,6 +3071,42 @@ public class PlayerStep : MonoBehaviour
         }
     }
 
+    // Hit detection for the stationary crawl kick
+    private void HandleCrawlKickHit()
+    {
+        float hitRange = 0.85f;
+        float kickSign = sprite.flipX ? -1f : 1f;
+        Vector2 hitCenter = (Vector2)transform.position + (Vector2)(transform.right * kickSign * 0.5f);
+
+        Collider2D[] hits = Physics2D.OverlapCircleAll(hitCenter, hitRange + 0.94f, enemyMask);
+        var seen = new HashSet<Component>();
+
+        foreach (var hit in hits)
+        {
+            Component enemy = (Component)hit.GetComponent<RobotStep>() ?? (Component)hit.GetComponent<GoblinStep>() ?? (Component)hit.GetComponent<ShockerStep>();
+            if (enemy == null || !seen.Add(enemy)) continue;
+
+            if (enemy is RobotStep r && r.eState == RobotStep.EnemyState.death) continue;
+            if (enemy is GoblinStep g && g.gState == GoblinStep.GoblinState.death) continue;
+            if (enemy is ShockerStep s && s.sState == ShockerStep.ShockerState.death) continue;
+
+            Vector2 hitPos = ((MonoBehaviour)enemy).transform.position;
+
+            if (Vector2.Distance(transform.position, hitPos) > hitRange) continue;
+
+            switch (enemy)
+            {
+                case RobotStep robot: OnHit.Invoke(robot); break;
+                case GoblinStep goblin: goblin.OnPlayerHit(goblin); break;
+                case ShockerStep shockerE: OnHitS.Invoke(shockerE); break;
+            }
+
+            combo++;
+            alarm3 = 300;
+            SpawnHitEffect(hitPos);
+        }
+    }
+
     public void PauseBeforeHit()
     {
         Animator tAnim = CombatTargetAnim;
@@ -3058,6 +3150,7 @@ public class PlayerStep : MonoBehaviour
         { MovementState.airpunch, "Player_Air_Punch" },
         { MovementState.airkick, "Player_Air_Kick" },
         { MovementState.uppercut, "Player_Uppercut" },
+        { MovementState.crawlkick, "Player_Crawl_Kick" },
     };
 
     private void PlayAttackAnimation(MovementState state)
@@ -3325,7 +3418,7 @@ public class PlayerStep : MonoBehaviour
 
             bool hittingToward = (transform.position.x > collision.transform.position.x && sprite.flipX) || (transform.position.x < collision.transform.position.x && !sprite.flipX);
 
-            if (carNormal && pState == PlayerState.dashenemy && hittingToward && IsAttackMoveWindow(si))
+            if (carNormal && CanBreakObjects(si) && hittingToward)
             {
                 rb.WakeUp();
                 rb.position = rb.position;
@@ -3339,7 +3432,7 @@ public class PlayerStep : MonoBehaviour
             rb.WakeUp();
             AnimatorStateInfo si = anim.GetCurrentAnimatorStateInfo(0);
 
-            if (collision.gameObject.GetComponent<BreakableDoor>().phase == 0 && pState == PlayerState.dashenemy && IsAttackMoveWindow(si))
+            if (collision.gameObject.GetComponent<BreakableDoor>().phase == 0 && CanBreakObjects(si))
             {
                 rb.WakeUp();
                 rb.position = rb.position;
@@ -3391,7 +3484,7 @@ public class PlayerStep : MonoBehaviour
             rb.WakeUp();
             AnimatorStateInfo si = anim.GetCurrentAnimatorStateInfo(0);
 
-            if (collision.gameObject.GetComponent<SwitchScript>().phase == 0 && pState == PlayerState.dashenemy && IsAttackMoveWindow(si))
+            if (collision.gameObject.GetComponent<SwitchScript>().phase == 0 && CanBreakObjects(si))
             {
                 rb.WakeUp();
                 rb.position = rb.position;
@@ -3404,7 +3497,7 @@ public class PlayerStep : MonoBehaviour
             rb.WakeUp();
             AnimatorStateInfo si = anim.GetCurrentAnimatorStateInfo(0);
 
-            if (collision.gameObject.GetComponent<ExplosiveScript>().phase == 0 && pState == PlayerState.dashenemy && IsAttackMoveWindow(si))
+            if (collision.gameObject.GetComponent<ExplosiveScript>().phase == 0 && CanBreakObjects(si))
             {
                 rb.WakeUp();
                 rb.position = rb.position;
@@ -3417,7 +3510,7 @@ public class PlayerStep : MonoBehaviour
             rb.WakeUp();
             AnimatorStateInfo si = anim.GetCurrentAnimatorStateInfo(0);
 
-            if (collision.gameObject.GetComponent<GeneratorScript>().phase == 0 && pState == PlayerState.dashenemy && IsAttackMoveWindow(si))
+            if (collision.gameObject.GetComponent<GeneratorScript>().phase == 0 && CanBreakObjects(si))
             {
                 rb.WakeUp();
                 rb.position = rb.position;
