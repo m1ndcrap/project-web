@@ -3176,7 +3176,7 @@ public class PlayerStep : MonoBehaviour
     {
         if (pState == PlayerState.death) return;
         if (!countering) ApplyHurtFromEnemy(target.sprite.flipX, false, target.transform.position);
-        else target.OnPlayerHit(target);
+        else target.OnPlayerHit(target, isCounterHit: true);
     }
 
     public void DamageShocker(ShockerStep target)

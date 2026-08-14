@@ -22,7 +22,7 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
     [SerializeField] private LayerMask playerMask;
 
     public enum MovementState { crouching, throwing, jump, idle, falling, hurt1, hurt2, sprinting, punch1, punch2, blocking, death, breakweb1, breakweb2 }
-    public enum GoblinState { on_glider, engaged, attack, getting_hit, death, jump_to_platform, blocking }
+    public enum GoblinState { on_glider, engaged, attack, getting_hit, death, jump_to_platform, blocking, evade }
     public GoblinState gState;
 
     // Sound Files
@@ -86,6 +86,17 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
     private bool blockOnGlider = false;
     public float swingKickHitCooldown = 0f;
     private bool counterTriggered = false;
+    [SerializeField] private float evadeJumpDuration = 0.5f;
+    [SerializeField] private float evadeJumpHeight = 1.5f;
+    [SerializeField] private float evadeJumpMinDist = 2f;
+    [SerializeField] private float evadeJumpMaxDist = 3.5f;
+    private Vector2 evadeJumpTarget;
+    private float evadeDir = 1f;
+    private bool evadeWillRush = false;
+    private float evadeRushDelay = 0f;
+    private int hitStreak = 0;
+    private float arenaLeftBound = -10.27f;
+    private float arenaRightBound = -1.27f;
 
     // health bar
     [SerializeField] public int health = 300;
@@ -163,8 +174,11 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
 
         AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
 
-        bool legitZeroAnimSpeed = (gState == GoblinState.death && stateInfo.normalizedTime >= 0.99f) || (gState == GoblinState.jump_to_platform && jumpT >= 0.45f && jumpT < 0.85f && stateInfo.IsName("Goblin_Jump"));
+
+        bool legitZeroAnimSpeed = (gState == GoblinState.death && stateInfo.normalizedTime >= 0.99f) || (gState == GoblinState.jump_to_platform && jumpT >= 0.45f && jumpT < 0.85f && stateInfo.IsName("Goblin_Jump")) || (gState == GoblinState.evade && jumpT < 1f && jumpT >= 0.45f && jumpT < 0.85f && stateInfo.IsName("Goblin_Jump"));
+        
         if (anim.speed == 0f && !legitZeroAnimSpeed) { anim.speed = 1f; }
+
 
         if (glider.state != GState.Throwing && glider.state != GState.AirFight && gState != GoblinState.engaged)
         {
@@ -359,14 +373,25 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
 
                         if (threw)
                         {
-                            if (stateInfo.IsName("Goblin_Throw") && normalizedTime >= 0.5f && normalizedTime <= 0.53f && FindObjectsOfType<PumpkinProjectile>().Length == 0)
+                            if (stateInfo.IsName("Goblin_Throw") && normalizedTime >= 0.5f && normalizedTime <= 0.53f)
                             {
-                                GameObject bomb = Instantiate(goblinBombPrefab, transform.position + Vector3.up * 0.48f, Quaternion.identity);
-                                int dir = sprite.flipX ? -1 : 1;
-                                bomb.GetComponent<PumpkinProjectile>().dir = dir;
-                                bomb.GetComponent<PumpkinProjectile>().airborne = true;
-                                AudioClip[] clips = { sndGAction1, sndGAction2 };
-                                audioSrc.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
+                                if (!noHitWall && FindObjectsOfType<PumpkinSpinner>().Length < 3)
+                                {
+                                    int dir = sprite.flipX ? -1 : 1;
+                                    SpawnSpinner(dir, RandomChoice(2, 4, 6, 8));
+                                    SpawnSpinner(dir, RandomChoice(4, 8, 12, 16));
+                                    SpawnSpinner(dir, RandomChoice(3, 6, 9, 12));
+                                    PlayGoblinActionSound();
+                                }
+                                else if (noHitWall && FindObjectsOfType<PumpkinProjectile>().Length == 0)
+                                {
+                                    GameObject bomb = Instantiate(goblinBombPrefab, transform.position + Vector3.up * 0.48f, Quaternion.identity);
+                                    int dir = sprite.flipX ? -1 : 1;
+                                    bomb.GetComponent<PumpkinProjectile>().dir = dir;
+                                    bomb.GetComponent<PumpkinProjectile>().airborne = true;
+                                    AudioClip[] clips = { sndGAction1, sndGAction2 };
+                                    audioSrc.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
+                                }
                             }
                         }
                     }
@@ -682,10 +707,10 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
                 {
                     anim.speed = 1f;
 
-                    if ((stateInfo.IsName("Goblin_Hit1") && stateInfo.normalizedTime >= 1f) || (stateInfo.IsName("Goblin_Hit2") && stateInfo.normalizedTime >= 1f) || (stateInfo.IsName("Goblin_BreakWeb1") && stateInfo.normalizedTime >= 1f)
-                        || (stateInfo.IsName("Goblin_BreakWeb2") && stateInfo.normalizedTime >= 1f))
+                    if ((stateInfo.IsName("Goblin_Hit1") && stateInfo.normalizedTime >= 1f) || (stateInfo.IsName("Goblin_Hit2") && stateInfo.normalizedTime >= 1f) || (stateInfo.IsName("Goblin_BreakWeb1") && stateInfo.normalizedTime >= 1f) || (stateInfo.IsName("Goblin_BreakWeb2") && stateInfo.normalizedTime >= 1f))
                     {
                         gState = GoblinState.engaged;
+                        TryForceEvadeAfterHit();
                     }
                 }
                 break;
@@ -721,6 +746,81 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
                     }
                 }
                 break;
+
+
+
+
+            case GoblinState.evade:
+                {
+                    sprite.flipX = evadeDir < 0f;
+
+                    if (jumpT < 1f)
+                    {
+                        rb.gravityScale = 0;
+                        rb.velocity = Vector2.zero;
+
+                        if (!jumpInitialized)
+                        {
+                            jumpStartPos = transform.position;
+                            jumpInitialized = true;
+                            anim.speed = 1f;
+                        }
+
+                        jumpT += Time.deltaTime / evadeJumpDuration;
+                        jumpT = Mathf.Clamp01(jumpT);
+
+                        Vector2 linearPos = Vector2.Lerp(jumpStartPos, evadeJumpTarget, jumpT);
+                        float arcOffset = Mathf.Sin(jumpT * Mathf.PI) * evadeJumpHeight;
+                        transform.position = new Vector2(linearPos.x, linearPos.y + arcOffset);
+
+                        if (stateInfo.IsName("Goblin_Jump"))
+                        {
+                            if (jumpT >= 0.45f && jumpT < 0.85f) { anim.speed = 0f; }
+                            else { anim.speed = 1f; }
+                        }
+
+                        if (jumpT >= 1f)
+                        {
+                            transform.position = evadeJumpTarget;
+                            rb.gravityScale = 1;
+                            jumpInitialized = false;
+
+                            if (Grounded()) audioSrc.PlayOneShot(sndLand);
+                        }
+                    }
+                    else
+                    {
+                        if (evadeRushDelay > 0f)
+                        {
+                            rb.velocity = new Vector2(0f, rb.velocity.y);
+                            evadeRushDelay -= Time.deltaTime;
+                        }
+                        else
+                        {
+                            if (evadeWillRush && Vector3.Distance(player.transform.position, transform.position) <= 5f)
+                            {
+                                gState = GoblinState.attack;
+                                AudioClip[] clips = { sndGAction1, sndGAction2 };
+                                int index = UnityEngine.Random.Range(0, clips.Length);
+                                if (index < clips.Length) { audioSrc.PlayOneShot(clips[index]); }
+                                rb.gravityScale = 0;
+
+                                int hitIndex = UnityEngine.Random.Range(0, 2);
+                                MovementState mstate = hitIndex == 0 ? MovementState.punch1 : MovementState.punch2;
+                                anim.speed = 1f;
+                                anim.SetInteger("mstate", (int)mstate);
+
+                                canAttack = false;
+                                player.isEnemyAttacking = true;
+                            }
+                            else
+                            {
+                                gState = GoblinState.engaged;
+                            }
+                        }
+                    }
+                }
+                break;
         }
 
         UpdateAnimationState();
@@ -728,7 +828,7 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
 
     private void UpdateAnimationState()
     {
-        if (gState != GoblinState.attack)
+        if (gState != GoblinState.attack && gState != GoblinState.evade)
         {
             if (dirX > 0f)
                 sprite.flipX = false;
@@ -739,6 +839,15 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
         if (gState == GoblinState.getting_hit) return;
         if (gState == GoblinState.blocking) return;
         if (gState == GoblinState.attack) return;
+
+        if (gState == GoblinState.evade)
+        {
+            sprite.flipX = evadeDir < 0f;
+
+            MovementState evadeMstate = jumpT < 1f ? MovementState.jump : MovementState.idle;
+            anim.SetInteger("mstate", (int)evadeMstate);
+            return;
+        }
 
         MovementState mstate = MovementState.idle;
 
@@ -862,7 +971,7 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
     {
         player.isEnemyAttacking = false;
 
-        if (gState == GoblinState.engaged || gState == GoblinState.attack || gState == GoblinState.getting_hit || (gState == GoblinState.on_glider && glider.state == GState.AirFight))
+        if (gState == GoblinState.engaged || gState == GoblinState.getting_hit || (gState == GoblinState.on_glider && glider.state == GState.AirFight) || (gState == GoblinState.attack && isCounterHit))
         {
             float dir = 0;
 
@@ -905,6 +1014,7 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
                 else
                 {
                     gState = GoblinState.getting_hit;
+                    hitStreak++;
 
                     int hitIndex = UnityEngine.Random.Range(0, 2);
 
@@ -1093,5 +1203,31 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
     int RandomChoice(params int[] values)
     {
         return values[UnityEngine.Random.Range(0, values.Length)];
+    }
+
+    private void StartEvasion()
+    {
+        gState = GoblinState.evade;
+        hitStreak = 0;
+
+        evadeDir = (transform.position.x < player.transform.position.x) ? -1f : 1f;
+
+        float jumpDist = UnityEngine.Random.Range(evadeJumpMinDist, evadeJumpMaxDist);
+        float targetX = Mathf.Clamp(transform.position.x + evadeDir * jumpDist, arenaLeftBound + 0.5f, arenaRightBound - 0.5f);
+
+        evadeJumpTarget = new Vector2(targetX, transform.position.y);
+        jumpT = 0f;
+        jumpInitialized = false;
+
+        evadeWillRush = UnityEngine.Random.Range(0, 2) == 0;
+        evadeRushDelay = evadeWillRush ? UnityEngine.Random.Range(0.2f, 0.5f) : 0f;
+    }
+
+    private void TryForceEvadeAfterHit()
+    {
+        float evadeChance = hitStreak >= 2 ? 1f : 0.5f;
+
+        if (UnityEngine.Random.value < evadeChance)
+            StartEvasion();
     }
 }

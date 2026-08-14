@@ -21,6 +21,7 @@ public class GliderScript : MonoBehaviour
 
     private float seconds;
     private bool moving;
+    private bool zoomMoving;
     private bool shot;
     private bool startedPath;
 
@@ -42,6 +43,8 @@ public class GliderScript : MonoBehaviour
     private int index;
     private float speed;
     private bool active;
+
+    private float zoomDir = 1f;
 
     void Start()
     {
@@ -130,6 +133,8 @@ public class GliderScript : MonoBehaviour
                 break;
 
 
+
+
             case GState.Throwing:
                 {
                     moving = false;
@@ -146,11 +151,13 @@ public class GliderScript : MonoBehaviour
                 break;
 
 
+
+
             case GState.Zooming:
                 {
                     float amount = (goblin.gState == GoblinStep.GoblinState.on_glider) ? 0.44f : 0.15f;
 
-                    if (!moving)
+                    if (!zoomMoving)
                     {
                         if (transform.position.x > screenLeft && transform.position.x < screenRight)
                         {
@@ -160,30 +167,32 @@ public class GliderScript : MonoBehaviour
                         else
                         {
                             int index = Random.Range(0, 2);
+
                             switch (index)
                             {
-                                case 0: { transform.position = new Vector2(screenLeft, player.transform.position.y); } break;
-                                case 1: { transform.position = new Vector2(screenRight, player.transform.position.y); } break;
+                                case 0: { transform.position = new Vector2(screenLeft, player.transform.position.y); zoomDir = 1f; } break;
+                                case 1: { transform.position = new Vector2(screenRight, player.transform.position.y); zoomDir = -1f; } break;
                             }
 
                             player.trigger = true;
                             player.alarm4 = 60;
-                            moving = true;
+                            zoomMoving = true;
                         }
                     }
 
-                    if (moving)
+                    if (zoomMoving)
                     {
-                        float dir = transform.position.x > screenLeft ? -1 : 1;
-                        sr.flipX = dir < 0;
+                        sr.flipX = zoomDir < 0;
 
-                        transform.position += Vector3.right * dir * amount * Time.deltaTime * 60f;
+                        transform.position += Vector3.right * zoomDir * amount * Time.deltaTime * 60f;
 
                         if (transform.position.x <= screenLeft || transform.position.x >= screenRight)
-                            moving = false;
+                            zoomMoving = false;
                     }
                 }
                 break;
+
+
 
 
             case GState.GroundFight:
@@ -193,12 +202,10 @@ public class GliderScript : MonoBehaviour
                         float target = Mathf.Abs(transform.position.x - screenRight) < Mathf.Abs(transform.position.x - screenLeft) ? screenRight : screenLeft;
                         transform.position = Vector2.MoveTowards(transform.position, new Vector2(target, transform.position.y), 0.1f * Time.deltaTime * 60f);
                     }
-                    else
-                    {
-                        moving = true;
-                    }
                 }
                 break;
+
+
 
 
             case GState.AirFight:
