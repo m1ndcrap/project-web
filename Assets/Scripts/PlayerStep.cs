@@ -154,6 +154,10 @@ public class PlayerStep : MonoBehaviour
     [SerializeField] public AudioClip sndLevelComplete;
     [SerializeField] public AudioClip sndGoblinBoss;
     [SerializeField] public AudioClip sndBoss;
+    [SerializeField] private AudioClip sndGTaunt1;
+    [SerializeField] private AudioClip sndGTaunt2;
+    [SerializeField] private AudioClip sndGTaunt3;
+
     private float senseSoundTimer = 0f;
     private bool wasGrounded = false;
 
@@ -682,6 +686,7 @@ public class PlayerStep : MonoBehaviour
                         Vector2 bestAttachPoint = Vector2.zero;
                         bool bestIsSwingPoint = false;
                         bool found = false;
+                        Collider2D bestCollider = null;
 
                         foreach (Collider2D hit in hits)
                         {
@@ -701,6 +706,7 @@ public class PlayerStep : MonoBehaviour
                                 bestAttachPoint = point;
                                 bestIsSwingPoint = isSwingPoint;
                                 swingPointSelected = bestIsSwingPoint;
+                                bestCollider = hit;
                                 found = true;
                             }
                         }
@@ -722,6 +728,14 @@ public class PlayerStep : MonoBehaviour
                             alarm1 = 400;
                             swingEnd = false;
                             pState = PlayerState.swing;
+
+                            GliderScript attachedGlider = bestCollider != null ? bestCollider.GetComponentInParent<GliderScript>() : null;
+
+                            if (attachedGlider != null && (attachedGlider.state == GliderScript.GState.Shooting || attachedGlider.state == GliderScript.GState.Throwing || attachedGlider.state == GliderScript.GState.AirFight))
+                            {
+                                AudioClip[] taunts = { sndGTaunt1, sndGTaunt2, sndGTaunt3 };
+                                audioSrc.PlayOneShot(taunts[UnityEngine.Random.Range(0, taunts.Length)]);
+                            }
                         }
                     }
 

@@ -89,11 +89,6 @@ PrefabInstance:
       insertIndex: 5
       addedObject: {fileID: 7636723412823419827}
   m_SourcePrefab: {fileID: 100100000, guid: 214da3cbceb95054a93d99686e0c99be, type: 3}
---- !u!82 &1319741679336732768 stripped
-AudioSource:
-  m_CorrespondingSourceObject: {fileID: 8799820148126606132, guid: 214da3cbceb95054a93d99686e0c99be, type: 3}
-  m_PrefabInstance: {fileID: 7516393280835017556}
-  m_PrefabAsset: {fileID: 0}
 --- !u!95 &2689058391541919944 stripped
 Animator:
   m_CorrespondingSourceObject: {fileID: 5557129136237865884, guid: 214da3cbceb95054a93d99686e0c99be, type: 3}
@@ -117,12 +112,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   player: {fileID: 0}
+  goblin: {fileID: 0}
   animator: {fileID: 2689058391541919944}
-  audioSource: {fileID: 1319741679336732768}
+  pumpkinLaunch: {fileID: 8300000, guid: e796f522b1358d24498870d9eb0d9c5f, type: 3}
+  pumpkinFly: {fileID: 8300000, guid: 912590c3728a5024fbc894ae40665f0f, type: 3}
   pumpkinBoom: {fileID: 8300000, guid: 0613c2ad407fdea4abb5aa0009a570cc, type: 3}
-  sndGLaugh1: {fileID: 8300000, guid: 906d11e3140f53f4d8ecc96ef631bfbe, type: 3}
-  sndGLaugh2: {fileID: 8300000, guid: f3b1ce79d58cebb4ea18151febec5844, type: 3}
-  sndGLaugh3: {fileID: 8300000, guid: d854546286bc8254dbbc4d172fb41435, type: 3}
   hspeed: 0
   dir: 1
   airborne: 0

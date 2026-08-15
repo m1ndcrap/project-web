@@ -14,11 +14,10 @@ public class SfxPlayer : MonoBehaviour
         Instance = this;
     }
 
-    public void PlayClipAtPointMatched(AudioClip clip, Vector3 position)
+    public void PlayClipAtPointMatched(AudioClip clip, Vector3 position, float volumeScale = 1f)
     {
         GameObject tempGO = new GameObject("TempAudio_" + clip.name);
         tempGO.transform.position = position;
-
         AudioSource src = tempGO.AddComponent<AudioSource>();
         src.clip = clip;
 
@@ -28,7 +27,7 @@ public class SfxPlayer : MonoBehaviour
         src.minDistance = referenceSource.minDistance;
         src.maxDistance = referenceSource.maxDistance;
         src.priority = referenceSource.priority;
-        src.volume = referenceSource.volume;
+        src.volume = referenceSource.volume * volumeScale;
         src.pitch = referenceSource.pitch;
         src.spread = referenceSource.spread;
         src.dopplerLevel = referenceSource.dopplerLevel;

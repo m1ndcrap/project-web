@@ -14,6 +14,17 @@ public class GliderScript : MonoBehaviour
     [SerializeField] public AudioSource sfx;
     [SerializeField] public AudioClip sndGLaugh2;
     [SerializeField] public AudioClip sndGLaugh3;
+    [SerializeField] public AudioClip sndGliderAccelerate;
+    [SerializeField] public AudioClip sndGliderDeaccelerate;
+    [SerializeField] public AudioClip sndGliderHover;
+    [SerializeField] public AudioClip sndGliderWhoosh1;
+    [SerializeField] public AudioClip sndGliderWhoosh2;
+    [SerializeField] public AudioClip sndGliderFly;
+    [SerializeField] public AudioSource hoverSource;
+    [SerializeField] public AudioSource flySource;
+
+    private GState previousState;
+
     public float screenLeft = -18f;
     public float screenRight = 7f;
 
@@ -46,6 +57,10 @@ public class GliderScript : MonoBehaviour
 
     private float zoomDir = 1f;
 
+    private enum AirTransition { None, MovingToStart, WaitingForJump, Active }
+    private AirTransition airTransition = AirTransition.None;
+    [SerializeField] private float airTransitionSpeed = 0.15f;
+
     void Start()
     {
         sr = GetComponent<SpriteRenderer>();
@@ -58,6 +73,7 @@ public class GliderScript : MonoBehaviour
         seconds = bgm.time;
 
         HandleMusicStates();
+        HandleStateAudioTransitions(previousState, state);
         HandleAirPathing();
         HandleAlarms();
 
@@ -80,6 +96,13 @@ public class GliderScript : MonoBehaviour
                         iniX = transform.position.x;
                         i = iniX - targetX;
                         moving = true;
+
+                        if (flySource != null)
+                        {
+                            flySource.clip = sndGliderFly;
+                            flySource.volume = 0.5f;
+                            flySource.Play();
+                        }
                     }
 	
 	                if (moving)
@@ -177,6 +200,7 @@ public class GliderScript : MonoBehaviour
                             player.trigger = true;
                             player.alarm4 = 60;
                             zoomMoving = true;
+                            PlayRandomWhoosh();
                         }
                     }
 
@@ -210,9 +234,6 @@ public class GliderScript : MonoBehaviour
 
             case GState.AirFight:
                 {
-                    if (goblin.gState != GoblinStep.GoblinState.on_glider && goblin.health > 0)
-                        goblin.gState = GoblinStep.GoblinState.on_glider;
-
                     sr.flipX = transform.position.x > player.transform.position.x;
 
                     if (player.GetComponent<PlayerStep>().attacking) return;
@@ -230,6 +251,8 @@ public class GliderScript : MonoBehaviour
                 }
                 break;
         }
+
+        previousState = state;
     }
 
     void HandleMusicStates()
@@ -255,13 +278,58 @@ public class GliderScript : MonoBehaviour
             startedPath = false;
             StopPath();
             ptSpeed = 0;
+            airTransition = AirTransition.None;
             return;
         }
 
         if (!startedPath)
         {
-            StartRandomPath(ptSpeed);
+            currentPath = paths[Random.Range(0, paths.Length)];
+            index = 0;
             startedPath = true;
+
+            if (goblin.gState == GoblinStep.GoblinState.on_glider)
+            {
+                // goblin never left the glider; no jump needed
+                airTransition = AirTransition.Active;
+                speed = ptSpeed;
+                active = true;
+            }
+            else
+            {
+                airTransition = AirTransition.MovingToStart;
+                active = false;
+            }
+        }
+
+        if (airTransition == AirTransition.MovingToStart)
+        {
+            Transform startPoint = currentPath.points[0];
+            transform.position = Vector2.MoveTowards(transform.position, startPoint.position, airTransitionSpeed * Time.deltaTime * 60f);
+            sr.flipX = transform.position.x > player.transform.position.x;
+
+            if (Vector2.Distance(transform.position, startPoint.position) < 0.05f)
+            {
+                transform.position = startPoint.position;
+                airTransition = AirTransition.WaitingForJump;
+                goblin.BeginJumpToGlider();
+            }
+
+            return;
+        }
+
+        if (airTransition == AirTransition.WaitingForJump)
+        {
+            sr.flipX = transform.position.x > player.transform.position.x;
+
+            if (goblin.gState == GoblinStep.GoblinState.on_glider)
+            {
+                airTransition = AirTransition.Active;
+                speed = ptSpeed;
+                active = true;
+            }
+
+            return;
         }
 
         float dist = Vector2.Distance(transform.position, player.transform.position);
@@ -318,5 +386,81 @@ public class GliderScript : MonoBehaviour
     public void SetSpeed(float s)
     {
         speed = s;
+    }
+
+
+
+    void HandleStateAudioTransitions(GState prev, GState current)
+    {
+        if (prev == current) return;
+
+        if (prev == GState.Shooting && current == GState.Throwing)
+        {
+            sfx.PlayOneShot(sndGliderDeaccelerate, 0.5f);
+        }
+        else if (prev == GState.Throwing && current == GState.Zooming)
+        {
+            sfx.PlayOneShot(sndGliderAccelerate, 0.5f);
+        }
+
+        if (prev == GState.Shooting && current != GState.Shooting)
+        {
+            StopFly();
+        }
+
+        if (current == GState.Throwing)
+        {
+            StartHoverLoop();
+        }
+        else if (prev == GState.Throwing)
+        {
+            StopHoverLoop();
+        }
+
+        if (current == GState.AirFight)
+        {
+            StartFlyLoop();
+        }
+        else if (prev == GState.AirFight)
+        {
+            StopFly();
+        }
+    }
+
+    void StartHoverLoop()
+    {
+        if (hoverSource == null) return;
+        hoverSource.clip = sndGliderHover;
+        hoverSource.loop = true;
+        hoverSource.volume = 0.5f;
+        if (!hoverSource.isPlaying) hoverSource.Play();
+    }
+
+    void StopHoverLoop()
+    {
+        if (hoverSource == null) return;
+        hoverSource.Stop();
+    }
+
+    void StartFlyLoop()
+    {
+        if (flySource == null) return;
+        flySource.clip = sndGliderFly;
+        flySource.loop = true;
+        flySource.volume = 0.5f;
+        if (!flySource.isPlaying) flySource.Play();
+    }
+
+    void StopFly()
+    {
+        if (flySource == null) return;
+        flySource.Stop();
+        flySource.loop = false;
+    }
+
+    void PlayRandomWhoosh()
+    {
+        AudioClip[] clips = { sndGliderWhoosh1, sndGliderWhoosh2 };
+        sfx.PlayOneShot(clips[Random.Range(0, clips.Length)], 0.5f);
     }
 }

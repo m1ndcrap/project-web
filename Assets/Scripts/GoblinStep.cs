@@ -22,7 +22,7 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
     [SerializeField] private LayerMask playerMask;
 
     public enum MovementState { crouching, throwing, jump, idle, falling, hurt1, hurt2, sprinting, punch1, punch2, blocking, death, breakweb1, breakweb2 }
-    public enum GoblinState { on_glider, engaged, attack, getting_hit, death, jump_to_platform, blocking, evade }
+    public enum GoblinState { on_glider, engaged, attack, getting_hit, death, jump_to_platform, blocking, evade, jump_to_glider }
     public GoblinState gState;
 
     // Sound Files
@@ -51,9 +51,7 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
     [SerializeField] private AudioClip sndBlock;
     [SerializeField] private AudioClip sndIntro;
     [SerializeField] private AudioClip sndIntro2;
-    [SerializeField] private AudioClip sndGTaunt1;
-    [SerializeField] private AudioClip sndGTaunt2;
-    [SerializeField] private AudioClip sndGTaunt3;
+
     private AudioClip sndQuickHit;
     private AudioClip sndQuickHit2;
     private AudioClip sndStrongHit;
@@ -175,8 +173,8 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
         AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
 
 
-        bool legitZeroAnimSpeed = (gState == GoblinState.death && stateInfo.normalizedTime >= 0.99f) || (gState == GoblinState.jump_to_platform && jumpT >= 0.45f && jumpT < 0.85f && stateInfo.IsName("Goblin_Jump")) || (gState == GoblinState.evade && jumpT < 1f && jumpT >= 0.45f && jumpT < 0.85f && stateInfo.IsName("Goblin_Jump"));
-        
+        bool legitZeroAnimSpeed = (gState == GoblinState.death && stateInfo.normalizedTime >= 0.99f) || (gState == GoblinState.jump_to_platform && jumpT >= 0.45f && jumpT < 0.85f && stateInfo.IsName("Goblin_Jump")) || (gState == GoblinState.evade && jumpT < 1f && jumpT >= 0.45f && jumpT < 0.85f && stateInfo.IsName("Goblin_Jump")) || (gState == GoblinState.jump_to_glider && jumpT >= 0.45f && jumpT < 0.85f && stateInfo.IsName("Goblin_Jump"));
+
         if (anim.speed == 0f && !legitZeroAnimSpeed) { anim.speed = 1f; }
 
 
@@ -192,7 +190,6 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
             throwing = false;
         }
 
-        if (glider.state == GState.AirFight && gState != GoblinState.on_glider && health > 0) { canThrow = true; gState = GoblinState.on_glider; }
         if (glider.state == GState.AirFight) { gliderActive = true; } else { gliderActive = false; }
         if (gliderActive && health == 0) { transform.position = new Vector2(glider.transform.position.x, glider.transform.position.y + 1.86f); rb.velocity = new Vector2(0f, 0f); }
 
@@ -821,6 +818,48 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
                     }
                 }
                 break;
+
+
+
+
+            case GoblinState.jump_to_glider:
+                {
+                    Vector2 targetPos = new Vector2(glider.transform.position.x, glider.transform.position.y + 0.54f);
+
+                    sprite.flipX = glider.sr.flipX;
+                    rb.gravityScale = 0;
+                    rb.velocity = Vector2.zero;
+
+                    if (!jumpInitialized)
+                    {
+                        jumpStartPos = transform.position;
+                        jumpT = 0f;
+                        jumpInitialized = true;
+                        anim.speed = 1f;
+                    }
+
+                    jumpT += Time.deltaTime / jumpDuration;
+                    jumpT = Mathf.Clamp01(jumpT);
+
+                    Vector2 linearPos = Vector2.Lerp(jumpStartPos, targetPos, jumpT);
+                    float arcOffset = Mathf.Sin(jumpT * Mathf.PI) * jumpArcHeight;
+                    transform.position = new Vector2(linearPos.x, linearPos.y + arcOffset);
+
+                    if (stateInfo.IsName("Goblin_Jump"))
+                    {
+                        if (jumpT >= 0.45f && jumpT < 0.85f) { anim.speed = 0f; }
+                        else { anim.speed = 1f; }
+                    }
+
+                    if (jumpT >= 1f)
+                    {
+                        transform.position = targetPos;
+                        jumpInitialized = false;
+                        canThrow = true;
+                        gState = GoblinState.on_glider;
+                    }
+                }
+                break;
         }
 
         UpdateAnimationState();
@@ -828,7 +867,7 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
 
     private void UpdateAnimationState()
     {
-        if (gState != GoblinState.attack && gState != GoblinState.evade)
+        if (gState != GoblinState.attack && gState != GoblinState.evade && gState != GoblinState.jump_to_glider)
         {
             if (dirX > 0f)
                 sprite.flipX = false;
@@ -846,6 +885,13 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
 
             MovementState evadeMstate = jumpT < 1f ? MovementState.jump : MovementState.idle;
             anim.SetInteger("mstate", (int)evadeMstate);
+            return;
+        }
+
+        if (gState == GoblinState.jump_to_glider)
+        {
+            sprite.flipX = glider.sr.flipX;
+            anim.SetInteger("mstate", (int)MovementState.jump);
             return;
         }
 
@@ -1229,5 +1275,14 @@ public class GoblinStep : MonoBehaviour, IEnemyBarrier
 
         if (UnityEngine.Random.value < evadeChance)
             StartEvasion();
+    }
+
+    public void BeginJumpToGlider()
+    {
+        if (gState == GoblinState.death) return;
+
+        gState = GoblinState.jump_to_glider;
+        jumpInitialized = false;
+        jumpT = 0f;
     }
 }

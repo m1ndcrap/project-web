@@ -8,6 +8,8 @@ public class PumpkinSpinner : MonoBehaviour
     public PlayerStep player;
     public GoblinStep goblin;
     public Animator animator;
+    public AudioClip pumpkinLaunch;
+    public AudioClip pumpkinFly;
     public AudioClip pumpkinBoom;
     float[] attractAcc = new float[2];
     public float hspeed;
@@ -19,6 +21,8 @@ public class PumpkinSpinner : MonoBehaviour
     bool canHit = true;
     float xstart;
     float targX;
+    int prevHSign;
+    int prevVSign;
 
     void Start()
     {
@@ -32,6 +36,11 @@ public class PumpkinSpinner : MonoBehaviour
         player.trigger = true;
         player.alarm4 = 60;
         transform.rotation = Quaternion.identity;
+
+        prevHSign = Sign(hspeed);
+        prevVSign = Sign(vspeed);
+        SfxPlayer.Instance.PlayClipAtPointMatched(pumpkinLaunch, transform.position, 0.25f);
+        SfxPlayer.Instance.PlayClipAtPointMatched(pumpkinFly, transform.position, 0.25f);
     }
 
     void Update()
@@ -63,6 +72,20 @@ public class PumpkinSpinner : MonoBehaviour
         vspeed += attractAcc[movY ? 1 : 0] * playerY;
 
         transform.Rotate(0, 0, 30f * dir * Time.deltaTime * 60f);
+
+
+        int currentHSign = Sign(hspeed);
+        int currentVSign = Sign(vspeed);
+        bool hFlipped = currentHSign != 0 && prevHSign != 0 && currentHSign != prevHSign;
+        bool vFlipped = currentVSign != 0 && prevVSign != 0 && currentVSign != prevVSign;
+
+        if (hFlipped || vFlipped)
+        {
+            SfxPlayer.Instance.PlayClipAtPointMatched(pumpkinFly, transform.position, 0.25f);
+        }
+
+        prevHSign = currentHSign;
+        prevVSign = currentVSign;
     }
 
     void ApplyMovement()
