@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: afa51237db9bdb948aae90f071232646
+guid: 17c06a06908a0834db5cab062e73015b
 TextureImporter:
   internalIDToNameTable: []
   externalObjects: {}
@@ -69,7 +69,7 @@ TextureImporter:
   platformSettings:
   - serializedVersion: 3
     buildTarget: DefaultTexturePlatform
-    maxTextureSize: 1024
+    maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
     textureCompression: 1
@@ -97,7 +97,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: spr_hydrant_strip5_0
+      name: spr_hydrant_0
       rect:
         serializedVersion: 2
         x: 0
@@ -111,14 +111,14 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 072ca974313393341bfe8e6b988825ff
-      internalID: -320523913
+      spriteID: bcf03bd2814a2ba4d8b1ec3275b4618d
+      internalID: 1929073401
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: spr_hydrant_strip5_1
+      name: spr_hydrant_1
       rect:
         serializedVersion: 2
         x: 180
@@ -132,14 +132,14 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: bcd76bc26286a9c42b61b10dd3dae28e
-      internalID: -289726202
+      spriteID: a198e0b7a4c5f6c488902696af6fd82d
+      internalID: -627558134
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: spr_hydrant_strip5_2
+      name: spr_hydrant_2
       rect:
         serializedVersion: 2
         x: 360
@@ -153,14 +153,14 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 1bcdc29f7aac8b142bd1febc4894d77f
-      internalID: 1420390052
+      spriteID: 761a7b79da66d434ba02045f82858501
+      internalID: -47614823
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: spr_hydrant_strip5_3
+      name: spr_hydrant_3
       rect:
         serializedVersion: 2
         x: 540
@@ -174,14 +174,14 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 24b134dee85419d46a25493b39eedbeb
-      internalID: -1291581591
+      spriteID: ba768a58522e98b4c8b8516f035dc746
+      internalID: 1484637830
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: spr_hydrant_strip5_4
+      name: spr_hydrant_4
       rect:
         serializedVersion: 2
         x: 720
@@ -195,8 +195,50 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: fa85158001cd80948a64c02a0fb4794c
-      internalID: 521796995
+      spriteID: 239228879eff302449787328ffbf1e1e
+      internalID: -1972808312
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_hydrant_5
+      rect:
+        serializedVersion: 2
+        x: 900
+        y: 0
+        width: 180
+        height: 80
+      alignment: 9
+      pivot: {x: 0.15, y: 0.15}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 3eb1cf56c5a3efb489bf1faddde84b13
+      internalID: -83817338
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spr_hydrant_6
+      rect:
+        serializedVersion: 2
+        x: 1080
+        y: 0
+        width: 180
+        height: 80
+      alignment: 9
+      pivot: {x: 0.15, y: 0.15}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: a9cd1564c9c4f9f4e9337dd53e9d678c
+      internalID: 1060576171
       vertices: []
       indices: 
       edges: []
@@ -212,11 +254,13 @@ TextureImporter:
     weights: []
     secondaryTextures: []
     nameFileIdTable:
-      spr_hydrant_strip5_0: -320523913
-      spr_hydrant_strip5_1: -289726202
-      spr_hydrant_strip5_2: 1420390052
-      spr_hydrant_strip5_3: -1291581591
-      spr_hydrant_strip5_4: 521796995
+      spr_hydrant_0: 1929073401
+      spr_hydrant_1: -627558134
+      spr_hydrant_2: -47614823
+      spr_hydrant_3: 1484637830
+      spr_hydrant_4: -1972808312
+      spr_hydrant_5: -83817338
+      spr_hydrant_6: 1060576171
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
