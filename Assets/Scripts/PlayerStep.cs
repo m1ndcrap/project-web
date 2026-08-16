@@ -33,6 +33,8 @@ public class PlayerStep : MonoBehaviour
     public bool swingEnd = false;
     [SerializeField] private float accelerationRate = -0.02f;
     [SerializeField] private bool swingPointSelected = false;
+    private float swingAnimFullSpeedThreshold = 1.2f;
+    private float swingAnimMinSpeed = 0f;
 
 
     // Swing kick variables
@@ -197,12 +199,18 @@ public class PlayerStep : MonoBehaviour
     public int combo = 0;
     [SerializeField] private Text comboText;
     private float postAttackBuffer = 0f;
+    private bool postAttackWasGrounded = false;
     private float attackTimeoutTimer = 0f;
     private float attackCooldown = 0f;
     private float attackCooldownDuration = 0.6f;    // minimum time between attack starts
     private float airAttackCooldownDuration = 0.52f; // minimum time between air kicks specifically
     private float launchedFreezeTimer = 0f;
-    private float launchGroundGrace = 0f;
+    public float launchGroundGrace = 0f;
+    public float launchTechTimer = 0f;
+    private float launchTechWindow = 0.35f; // time before jump can cancel launched hitstun
+    private bool oKeyReleaseRequired = false;
+    private const float FacingDeadzone = 0.15f;
+
 
     // Unified combat target, can be a robot, goblin, or shocker
     private Component currentCombatTarget = null;
@@ -264,6 +272,12 @@ public class PlayerStep : MonoBehaviour
             ShockerStep s => s.sState == ShockerStep.ShockerState.death,
             _ => true
         };
+    }
+
+    private bool PassesFacingCheck(float dx, bool facingLeft)
+    {
+        if (Mathf.Abs(dx) < FacingDeadzone) return true;
+        return !((facingLeft && dx > 0) || (!facingLeft && dx < 0));
     }
 
     private Component currentCounterTarget = null;
@@ -409,7 +423,24 @@ public class PlayerStep : MonoBehaviour
     {
         if (pState == PlayerState.swing)
         {
-            rb.MovePosition(new Vector2(ropeX, ropeY));
+            Vector2 currentPos = rb.position;
+            Vector2 targetPos = new Vector2(ropeX, ropeY);
+            Vector2 delta = targetPos - currentPos;
+            float dist = delta.magnitude;
+
+            if (dist > 0.0001f)
+            {
+                float castRadius = Mathf.Min(coll.size.x, coll.size.y) * 0.4f;
+                RaycastHit2D swingHit = Physics2D.CircleCast(currentPos, castRadius, delta.normalized, dist, jumpableGround);
+
+                if (swingHit.collider != null)
+                {
+                    ForceExitSwingToCrawl(swingHit.point, swingHit.normal);
+                    return; // don't MovePosition into/through it this frame
+                }
+            }
+
+            rb.MovePosition(targetPos);
         }
     }
 
@@ -453,6 +484,10 @@ public class PlayerStep : MonoBehaviour
         // Getting hit while crawl-kicking orphans this flag, which then blocks all future animation updates in UpdateAnimationState()
         if (pState == PlayerState.hurt && crawlKickTriggered)
             crawlKickTriggered = false;
+
+        // Getting hit while the swing-end animation is still playing orphans this flag the same way, permanently blocking UpdateAnimationState()
+        if (pState == PlayerState.hurt && swingEnd)
+            swingEnd = false;
 
         UpdateBarrierContact();
         UpdateEnemyTopBlock();
@@ -588,6 +623,8 @@ public class PlayerStep : MonoBehaviour
             currentCounterTarget = candidate;
         }
 
+        RefreshCombatTarget(origin);
+
         // Spider sense
         if ((trigger || currentCounterTarget != null) && !spiderSense && pState != PlayerState.death)
         {
@@ -630,11 +667,18 @@ public class PlayerStep : MonoBehaviour
         if (swingKickTriggered && anim.speed == 0f)
             anim.speed = 1f;
 
+        // Attack anim speed can get stuck at 0 if waitingToHit never resolves
+        if (attacking && anim.speed == 0f && !waitingToHit)
+            anim.speed = 1f;
+
         if (stopMove)
             pState = PlayerState.normal;
 
         if (uKeyReleaseRequired && !Input.GetKey(KeyCode.U))
             uKeyReleaseRequired = false;
+
+        if (oKeyReleaseRequired && !Input.GetKey(KeyCode.O))
+            oKeyReleaseRequired = false;
 
         switch (pState)
         {
@@ -908,11 +952,11 @@ public class PlayerStep : MonoBehaviour
                     currentCombatTarget = ResolveCombatTarget(origin, facingLeft, closestEnemy, closestEDistance);
 
                     // Attack
-                    if (Input.GetKey(KeyCode.O) && currentCombatTarget != null && !stopMove && attackCooldown <= 0f)
+                    if (Input.GetKey(KeyCode.O) && currentCombatTarget != null && !stopMove && attackCooldown <= 0f && !oKeyReleaseRequired)
                     {
                         StartAttackTowardTarget(CombatTargetTransform, attacking: true);
                     }
-                    else if (Input.GetKey(KeyCode.O) && currentCombatTarget == null && !stopMove && attackCooldown <= 0f)
+                    else if (Input.GetKey(KeyCode.O) && currentCombatTarget == null && !stopMove && attackCooldown <= 0f && !oKeyReleaseRequired)
                     {
                         StartAttackTowardTarget(null, attacking: false);
                     }
@@ -1059,6 +1103,7 @@ public class PlayerStep : MonoBehaviour
                         hasTurnInner = false;
                         hasTurnOuter = false;
                         visual.rotation = Quaternion.Euler(0, 0, 0);
+                        anim.speed = 1f;
                         StartCoroutine(RotateAroundCorner(new Vector3(0.1f, 0.1f, 0), -90f, 2));
                     }
                     else if (nearCeiling)
@@ -1066,6 +1111,7 @@ public class PlayerStep : MonoBehaviour
                         hasTurnInner = false;
                         hasTurnOuter = false;
                         visual.rotation = Quaternion.Euler(0, 0, 0);
+                        anim.speed = 1f;
                         StartCoroutine(RotateAroundCorner(new Vector3(0f, 0.15f, 0), 180f, 3));
                     }
 
@@ -1848,7 +1894,7 @@ public class PlayerStep : MonoBehaviour
                             currentCounterTarget = ctr2;
 
                             // Next attack input
-                            if (Input.GetKey(KeyCode.O) && currentCombatTarget != null && attackCooldown <= 0f)
+                            if (Input.GetKey(KeyCode.O) && currentCombatTarget != null && attackCooldown <= 0f && !oKeyReleaseRequired)
                             {
                                 dash_spd = CalcDashSpeed(CombatTargetTransform);
                                 attacking = true;
@@ -1857,8 +1903,9 @@ public class PlayerStep : MonoBehaviour
                                 PlayAttackAnimation(PickAttackAnimation());
                                 rb.gravityScale = 0;
                                 pastHitEvent = false;
+                                oKeyReleaseRequired = true;
                             }
-                            else if (Input.GetKey(KeyCode.O) && currentCombatTarget == null && attackCooldown <= 0f)
+                            else if (Input.GetKey(KeyCode.O) && currentCombatTarget == null && attackCooldown <= 0f && !oKeyReleaseRequired)
                             {
                                 dash_spd = 0f;
                                 attacking = false;
@@ -1866,6 +1913,7 @@ public class PlayerStep : MonoBehaviour
                                 anim.speed = 1.5f;
                                 PlayAttackAnimation(PickAttackAnimation());
                                 pastHitEvent = false;
+                                oKeyReleaseRequired = true;
                             }
 
                             if (Input.GetKey(KeyCode.L) && Grounded() && attackCooldown <= 0f)
@@ -1920,6 +1968,7 @@ public class PlayerStep : MonoBehaviour
                             pastHitEvent = false;
                             pState = PlayerState.normal;
                             postAttackBuffer = 0.1f;
+                            postAttackWasGrounded = Grounded();
                             countering = false;
                             uppercut = false;
                             waitingToHit = false;
@@ -1941,6 +1990,7 @@ public class PlayerStep : MonoBehaviour
                                 pastHitEvent = false;
                                 pState = PlayerState.normal;
                                 postAttackBuffer = 0.1f;
+                                postAttackWasGrounded = Grounded();
                                 countering = false;
                                 uppercut = false;
                                 waitingToHit = false;
@@ -1999,6 +2049,7 @@ public class PlayerStep : MonoBehaviour
                             pastHitEvent = false;
                             pState = PlayerState.normal;
                             postAttackBuffer = 0.1f;
+                            postAttackWasGrounded = Grounded();
                             countering = false;
                             uppercut = false;
                             counterRB.gravityScale = 1;
@@ -2011,11 +2062,14 @@ public class PlayerStep : MonoBehaviour
                         rb.gravityScale = 1f;
                         if (Grounded()) rb.velocity = Vector2.zero;
 
-                        if (stateInfo.normalizedTime >= 1f)
+                        bool targetNowAvailable = currentCombatTarget != null || currentCounterTarget != null;
+
+                        if (stateInfo.normalizedTime >= 1f || (targetNowAvailable && stateInfo.normalizedTime >= 0.2f))
                         {
                             pastHitEvent = false;
                             pState = PlayerState.normal;
                             postAttackBuffer = 0.1f;
+                            postAttackWasGrounded = Grounded();
                             countering = false;
                             anim.speed = 1;
                             uppercut = false;
@@ -2043,10 +2097,25 @@ public class PlayerStep : MonoBehaviour
 
                     if (stateInfo.IsName("Player_Launched"))
                     {
+                        launchTechTimer += Time.deltaTime;
+
                         if (stateInfo.normalizedTime >= 1f)
                             anim.speed = 0f;
 
-                        if (Grounded() && launchGroundGrace <= 0f)
+                        bool techWindowOpen = launchTechTimer >= launchTechWindow;
+                        bool techInput = techWindowOpen && Input.GetKeyDown("space");
+
+                        if (techInput)
+                        {
+                            rb.velocity = new Vector2(rb.velocity.x, jspd);
+                            AudioClip[] clips = { sndJump, sndJump2 };
+                            int index = UnityEngine.Random.Range(0, clips.Length + 1);
+                            if (index < clips.Length) audioSrc.PlayOneShot(clips[index]);
+
+                            anim.speed = 1f;
+                            pState = PlayerState.normal;
+                        }
+                        else if (Grounded() && launchGroundGrace <= 0f)
                         {
                             anim.speed = 1f;
                             pState = PlayerState.normal;
@@ -2169,12 +2238,16 @@ public class PlayerStep : MonoBehaviour
                 }
             }
 
+            bool hitLanded = true;
+
             switch (target)
             {
                 case RobotStep rb2: OnHit.Invoke(rb2); break;
-                case GoblinStep g: OnHitG.Invoke(g); break;
+                case GoblinStep g: hitLanded = g.OnPlayerHit(g); break;
                 case ShockerStep s: OnHitS.Invoke(s); break;
             }
+
+            if (!hitLanded) continue;
 
             combo++;
             alarm3 = 300;
@@ -2187,9 +2260,13 @@ public class PlayerStep : MonoBehaviour
     // Resolve which combat target to use: robot, shocker, or goblin
     private Component ResolveCombatTarget(Vector2 origin, bool facingLeft, RobotStep closestRobot, float closestRobotDist)
     {
-        // Boss scene always targets goblin
         if (SceneManager.GetActiveScene().name == "Boss")
-            return boss;
+        {
+            if (!IsBossMeleeResolvable())
+                return null;
+
+            return IsValidMeleeCandidate(origin, facingLeft, boss.transform) ? boss : null;
+        }
 
         // Mission scene compares the shocker against the closest robot
         if (SceneManager.GetActiveScene().name == "Mission" && shocker != null && shocker.sState != ShockerStep.ShockerState.death)
@@ -2209,9 +2286,39 @@ public class PlayerStep : MonoBehaviour
         return closestRobot;
     }
 
+    private bool IsBossMeleeResolvable()
+    {
+        if (boss == null) return false;
+        return boss.gState == GoblinStep.GoblinState.engaged || boss.gState == GoblinStep.GoblinState.getting_hit || (boss.gState == GoblinStep.GoblinState.on_glider && boss.glider.state == GliderScript.GState.AirFight);
+    }
+
+    private bool IsValidMeleeCandidate(Vector2 origin, bool facingLeft, Transform targetTf)
+    {
+        if (targetTf == null) return false;
+
+        float dx = targetTf.position.x - origin.x;
+        if (!PassesFacingCheck(dx, facingLeft)) return false;
+
+        if (Mathf.Abs(dx) > 5.2f) return false;
+
+        RaycastHit2D hit = Physics2D.Linecast(transform.position, targetTf.position, jumpableGround);
+        if (hit.collider != null && (Vector2)hit.point != (Vector2)targetTf.position) return false;
+
+        foreach (var hl in Physics2D.LinecastAll(transform.position, targetTf.position))
+        {
+            LightningScript ls = hl.collider?.GetComponent<LightningScript>();
+            if (ls != null && ls.phase == 0) return false;
+        }
+
+        return true;
+    }
+
     private void StartAttackTowardTarget(Transform targetTransform, bool attacking)
     {
-        rb.velocity = Vector2.zero;
+        bool isAirWhiff = targetTransform == null && !Grounded();
+
+        if (!isAirWhiff)
+            rb.velocity = Vector2.zero;
 
         if (targetTransform != null)
             dash_spd = CalcDashSpeed(targetTransform);
@@ -2220,6 +2327,7 @@ public class PlayerStep : MonoBehaviour
 
         this.attacking = attacking;
         SetAttackCooldown();
+        oKeyReleaseRequired = true;
 
         if (pState != PlayerState.dashenemy)
         {
@@ -2281,6 +2389,8 @@ public class PlayerStep : MonoBehaviour
 
         if (pState == PlayerState.hurt) return;
 
+        if (pState == PlayerState.dashenemy) return;
+
         if (pState != PlayerState.crawl)
         {
             if (dirX > 0f) sprite.flipX = false;
@@ -2293,7 +2403,6 @@ public class PlayerStep : MonoBehaviour
         }
 
         if (swingEnd) return;
-        if (pState == PlayerState.dashenemy) return;
 
         // Don't override the swing kick animation while it's playing
         if (swingKickTriggered && anim.GetCurrentAnimatorStateInfo(0).IsName("Player_Swing_Kick")) return;
@@ -2320,7 +2429,7 @@ public class PlayerStep : MonoBehaviour
                 {
                     mstate = (dirX != 0f && !pushingIntoBarrier) ? MovementState.running : MovementState.idle;
                 }
-                else if (postAttackBuffer > 0f)
+                else if (postAttackBuffer > 0f && postAttackWasGrounded)
                 {
                     mstate = (dirX != 0f && !pushingIntoBarrier) ? MovementState.running : MovementState.idle;
                 }
@@ -2335,13 +2444,16 @@ public class PlayerStep : MonoBehaviour
             if (swingKickTriggered)
             {
                 mstate = MovementState.swingkick;
+                anim.speed = 1f;
             }
             else
             {
                 mstate = MovementState.swinging;
-            }
 
-            anim.speed = 1f;
+                float speed = Mathf.Abs(ropeAngleVelocity);
+                float t = Mathf.Clamp01(speed / swingAnimFullSpeedThreshold);
+                anim.speed = Mathf.Lerp(swingAnimMinSpeed, 1f, t);
+            }
         }
         else if (pState == PlayerState.crawl)
         {
@@ -2512,6 +2624,7 @@ public class PlayerStep : MonoBehaviour
         swingKickTriggered = false;
         swingKickTargets.Clear();
         swingKickCooldown = 0f;
+        anim.speed = 1f;
         coll.size = new Vector2(0.8397379f, 1.615343f);
         coll.offset = new Vector2(-0.03511286f, -0.03012538f);
     }
@@ -2909,6 +3022,67 @@ public class PlayerStep : MonoBehaviour
             rb.position = snapHit.point + snapHit.normal * offset;
     }
 
+    // Only kicks the player out of crawl if they were actually crawling on THIS collider
+    public void ForceExitCrawlIfOn(Collider2D brokenCollider)
+    {
+        if (pState != PlayerState.crawl || brokenCollider == null) return;
+
+        RaycastHit2D hit = Physics2D.Raycast(rb.position, -transform.up, GetGroundOffsetMagnitude() + 0.5f, jumpableGround);
+        if (hit.collider != brokenCollider) return;
+
+        if (activeTurnCoroutine != null)
+        {
+            StopCoroutine(activeTurnCoroutine);
+            activeTurnCoroutine = null;
+        }
+
+        isTurningInner = false;
+        isTurningOuter = false;
+        isTurningLegacy = false;
+        hasTurnInner = false;
+        hasTurnOuter = false;
+
+        crawlKickTriggered = false;
+
+        transform.rotation = Quaternion.identity;
+        direction = 1;
+
+        coll.size = new Vector2(0.8397379f, 1.615343f);
+        coll.offset = new Vector2(-0.03511286f, -0.03012538f);
+
+        pState = PlayerState.normal;
+        rb.gravityScale = 1f;
+        anim.speed = 1f;
+    }
+
+    private void ForceExitSwingToCrawl(Vector2 hitPoint, Vector2 hitNormal)
+    {
+        visual.rotation = Quaternion.Euler(0f, 0f, 0f);
+
+        float surfaceAngle = Mathf.Atan2(hitNormal.y, hitNormal.x) * Mathf.Rad2Deg;
+        transform.rotation = Quaternion.Euler(0f, 0f, surfaceAngle - 90f);
+        direction = GetDirectionFromRotation();
+        SnapRotationToDirection();
+
+        rb.position = hitPoint + hitNormal * GetGroundOffsetMagnitude();
+
+        coll.size = new Vector2(0.8397379f, 1.615343f);
+        coll.offset = new Vector2(-0.03511286f, -0.03012538f);
+        audioSrc.PlayOneShot(sndWebSnap);
+
+        swingPointSelected = false;
+        ReturnAllRopeSegmentsToPool();
+        rb.gravityScale = 0;
+        swingKickTriggered = false;
+        swingKickTargets.Clear();
+        swingKickCooldown = 0f;
+        ropeAngleVelocity = 0f;
+        anim.speed = 1f;
+
+        pState = PlayerState.crawl;
+        crawlEntryGrace = 0.1f;
+    }
+
     BoundsInt GetCameraTileBounds(Tilemap tilemap, Camera cam)
     {
         Vector3 min = cam.ViewportToWorldPoint(new Vector3(0, 0, 0));
@@ -2939,8 +3113,9 @@ public class PlayerStep : MonoBehaviour
         // Face the target
         sprite.flipX = target.transform.position.x <= transform.position.x;
 
-        // Aerial attacks use 2D distance, ground attacks use x only
-        float attackDist = playerGrounded ? 0.45f : 0.2f;
+        bool targetAirborne = !CombatTargetGrounded();
+        bool useGroundMetric = playerGrounded && !targetAirborne;
+        float attackDist = useGroundMetric ? 0.45f : 0.2f;
 
         // Goblin on a glider needs a tighter distance
         if (target.TryGetComponent<GoblinStep>(out var g) && g.gState == GoblinStep.GoblinState.on_glider)
@@ -2950,7 +3125,7 @@ public class PlayerStep : MonoBehaviour
         rb.velocity = Vector2.zero;
         rb.angularVelocity = 0;
 
-        float dist = playerGrounded ? Mathf.Abs(target.transform.position.x - transform.position.x) : Vector2.Distance(transform.position, target.transform.position);
+        float dist = useGroundMetric ? Mathf.Abs(target.transform.position.x - transform.position.x) : Vector2.Distance(transform.position, target.transform.position);
 
         bool inMoveWindow = IsAttackMoveWindow(si);
 
@@ -2964,6 +3139,7 @@ public class PlayerStep : MonoBehaviour
                 pastHitEvent = false;
                 pState = PlayerState.normal;
                 postAttackBuffer = 0.1f;
+                postAttackWasGrounded = Grounded();
                 attacking = false;
                 waitingToHit = false;
                 uppercut = false;
@@ -2982,10 +3158,10 @@ public class PlayerStep : MonoBehaviour
             attackTimeoutTimer = 0f;
         }
 
-        if (dist >= attackDist && !waitingToHit && inMoveWindow)
+        if (dist >= attackDist && !waitingToHit)
         {
             float step = dash_spd * Time.deltaTime;
-            float actualStep = playerGrounded ? step : Mathf.Min(step, dist - 0.05f);
+            float actualStep = useGroundMetric ? step : Mathf.Min(step, dist - 0.05f);
 
             if (actualStep > 0)
                 transform.position = Vector2.MoveTowards(transform.position, target.transform.position, actualStep);
@@ -3001,7 +3177,7 @@ public class PlayerStep : MonoBehaviour
             else
             {
                 float step = dash_spd * Time.deltaTime;
-                float actualStep = playerGrounded ? step : Mathf.Min(step, dist - 0.05f);
+                float actualStep = useGroundMetric ? step : Mathf.Min(step, dist - 0.05f);
 
                 if (actualStep > 0)
                     transform.position = Vector2.MoveTowards(transform.position, target.transform.position, actualStep);
@@ -3013,6 +3189,7 @@ public class PlayerStep : MonoBehaviour
             pastHitEvent = false;
             pState = PlayerState.normal;
             postAttackBuffer = 0.1f;
+            postAttackWasGrounded = Grounded();
             attacking = false;
             uppercut = false;
             anim.speed = 1f;
@@ -3152,6 +3329,60 @@ public class PlayerStep : MonoBehaviour
         }
     }
 
+    private void RefreshCombatTarget(Vector2 origin)
+    {
+        bool facingLeft = sprite.flipX;
+
+        if (Input.GetAxisRaw("Horizontal") > 0)
+            facingLeft = false;
+        else if (Input.GetAxisRaw("Horizontal") < 0)
+            facingLeft = true;
+
+        Collider2D[] ehits = Physics2D.OverlapCircleAll(origin, 5.2f, enemyMask);
+        float closestEDistance = Mathf.Infinity;
+        RobotStep closestEnemy = null;
+
+        foreach (var ehit in ehits)
+        {
+            RobotStep enemy = ehit.GetComponent<RobotStep>();
+            
+            if (enemy == null || enemy.eState == RobotStep.EnemyState.death || !enemy.IsTargetable) continue;
+            
+
+            RaycastHit2D hit = Physics2D.Linecast(transform.position, enemy.transform.position, jumpableGround);
+            
+            if (hit.collider != null && (Vector2)hit.point != (Vector2)enemy.transform.position) continue;
+
+
+            bool noLightning = true;
+            
+            foreach (var hl in Physics2D.LinecastAll(transform.position, enemy.transform.position))
+            {
+                LightningScript ls = hl.collider?.GetComponent<LightningScript>();
+                if (ls != null && ls.phase == 0) { noLightning = false; break; }
+            }
+            
+            if (!noLightning) continue;
+
+
+            float dx = enemy.transform.position.x - origin.x;
+            
+            if ((facingLeft && dx > 0) || (!facingLeft && dx < 0)) continue;
+
+
+            float dist = Mathf.Abs(dx);
+            
+            if (dist < closestEDistance)
+            {
+                closestEDistance = dist;
+                closestEnemy = enemy;
+            }
+        }
+
+        currentTarget = closestEnemy;
+        currentCombatTarget = ResolveCombatTarget(origin, facingLeft, closestEnemy, closestEDistance);
+    }
+
     public void SpawnHitEffect(Vector2 impactPoint) { Instantiate(hitParticlePrefab, impactPoint, Quaternion.identity); }
     public void SpawnHurtEffect(Vector2 impactPoint) { Instantiate(hurtParticlePrefab, impactPoint, Quaternion.identity); }
 
@@ -3217,7 +3448,7 @@ public class PlayerStep : MonoBehaviour
         countering = false;
         waitingToHit = false;
 
-        rb.velocity = isKick ? new Vector2(dir * 2f, 5f) : new Vector2(dir, 0f);
+        rb.velocity = isKick ? new Vector2(dir * 3f, 5f) : new Vector2(dir, 0f);
         anim.speed = 1f;
         combo = 0;
         pState = PlayerState.hurt;
@@ -3228,6 +3459,7 @@ public class PlayerStep : MonoBehaviour
         {
             mstate = MovementState.launched;
             launchGroundGrace = 0.2f;
+            launchTechTimer = 0f;
             AudioClip[] clips = { sndStrongHit, sndStrongHit2 };
             audioSrc.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
         }
@@ -3569,7 +3801,8 @@ public class PlayerStep : MonoBehaviour
 
 
             float dir = sprite.flipX ? 1f : -1f;
-            rb.velocity = new Vector2(dir * 1.5f, 5f);
+            dirX = dir;
+            rb.velocity = new Vector2(dir * 3f, 5f);
 
             anim.speed = 1f;
             combo = 0;
@@ -3577,6 +3810,7 @@ public class PlayerStep : MonoBehaviour
 
             anim.SetInteger("mstate", (int)MovementState.launched);
             launchGroundGrace = 0.2f;
+            launchTechTimer = 0f;
             enemyHitSpawn = collision.transform.position;
             SpawnHurtEffect(transform.position);
 
@@ -3619,6 +3853,7 @@ public class PlayerStep : MonoBehaviour
 
 
             float dir = sprite.flipX ? 1f : -1f;
+            dirX = dir;
             rb.velocity = new Vector2(dir * 2f, 5f);
 
             anim.speed = 1f;
@@ -3657,14 +3892,16 @@ public class PlayerStep : MonoBehaviour
 
 
             float dir = sprite.flipX ? 1f : -1f;
+            dirX = dir;
             float dY = collision.transform.position.y > transform.position.y ? -0.7f : 1f;
-            rb.velocity = new Vector2(dir * 2f, 5f * dY);
+            rb.velocity = new Vector2(dir * 3f, 5f * dY);
 
             anim.speed = 1f;
             combo = 0;
             pState = PlayerState.hurt;
 
             anim.SetInteger("mstate", (int)MovementState.launched);
+            launchTechTimer = 0f;
             launchGroundGrace = 0.2f;
             enemyHitSpawn = collision.transform.position;
             SpawnHurtEffect(transform.position);
@@ -3699,14 +3936,16 @@ public class PlayerStep : MonoBehaviour
 
 
             float dir = sprite.flipX ? 1f : -1f;
+            dirX = dir;
             float dY = collision.transform.position.y > transform.position.y ? -0.7f : 1f;
-            rb.velocity = new Vector2(dir * 2f, 5f * dY);
+            rb.velocity = new Vector2(dir * 3f, 5f * dY);
             anim.speed = 1f;
 
             combo = 0;
             pState = PlayerState.hurt;
 
             anim.SetInteger("mstate", (int)MovementState.launched);
+            launchTechTimer = 0f;
             launchGroundGrace = 0.2f;
             enemyHitSpawn = collision.transform.position;
             SpawnHurtEffect(transform.position);
@@ -3741,14 +3980,16 @@ public class PlayerStep : MonoBehaviour
 
 
             float dir = sprite.flipX ? 1f : -1f;
+            dirX = dir;
             float dY = collision.transform.position.y > transform.position.y ? -0.7f : 1f;
-            rb.velocity = new Vector2(dir * 2f, 5f * dY);
+            rb.velocity = new Vector2(dir * 3f, 5f * dY);
 
             anim.speed = 1f;
             combo = 0;
             pState = PlayerState.hurt;
 
             anim.SetInteger("mstate", (int)MovementState.launched);
+            launchTechTimer = 0f;
             launchGroundGrace = 0.2f;
             enemyHitSpawn = collision.transform.position;
             SpawnHurtEffect(transform.position);

@@ -58,6 +58,8 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
     private bool wasGrounded = false;
     private bool hasPlayedStep1;
     private bool hasPlayedStep2;
+    private bool hasPlayedDeathSound = false;
+    private bool hasPlayedDeathLandSound = false;
 
     // Alarms
     [SerializeField] public int alarm4 = 0;
@@ -653,10 +655,7 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
                     rb.velocity = new Vector2(shockerVelX, rb.velocity.y);
 
                     // Melee attack when player is close
-                    if (distanceFromPlayer <= 0.8f && !player.isEnemyAttacking && Grounded() &&
-                        ((!sprite.flipX && transform.position.x < player.transform.position.x) ||
-                            (sprite.flipX && transform.position.x > player.transform.position.x)) &&
-                        canAttack)
+                    if (distanceFromPlayer <= 0.8f && !player.isEnemyAttacking && Grounded() && ((!sprite.flipX && transform.position.x < player.transform.position.x) || (sprite.flipX && transform.position.x > player.transform.position.x)) && canAttack)
                     {
                         sState = ShockerState.attack;
                         PlayAttackSounds();
@@ -669,6 +668,8 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
 
                         canAttack = false;
                         player.isEnemyAttacking = true;
+                        player.trigger = true;
+                        player.alarm4 = 60;
                     }
 
 
@@ -866,6 +867,8 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
 
                                 canAttack = false;
                                 player.isEnemyAttacking = true;
+                                player.trigger = true;
+                                player.alarm4 = 60;
                             }
                             else
                             {
@@ -982,12 +985,20 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
 
             if (normalizedTime >= 0f && normalizedTime <= 0.025f)
             {
-                if (Grounded()) audioSrc.PlayOneShot(sndDeath);
+                if (Grounded() && !hasPlayedDeathSound)
+                {
+                    audioSrc.PlayOneShot(sndDeath);
+                    hasPlayedDeathSound = true;
+                }
             }
 
             if (normalizedTime >= 0.354f && normalizedTime <= 0.405f)
             {
-                if (Grounded()) audioSrc.PlayOneShot(sndLand);
+                if (Grounded() && !hasPlayedDeathLandSound)
+                {
+                    audioSrc.PlayOneShot(sndLand);
+                    hasPlayedDeathLandSound = true;
+                }
             }
 
             if (!startAlarm2)
@@ -1132,7 +1143,7 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
 
     public void AttackEvent()
     {
-        if (Vector3.Distance(player.transform.position, transform.position) <= 0.45f)
+        if (Vector3.Distance(player.transform.position, transform.position) <= 0.55f)
             player.DamageShocker(this);
     }
 

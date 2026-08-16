@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
 public class KeyDoors : MonoBehaviour
 {
     public int phase = 0;
@@ -16,14 +15,23 @@ public class KeyDoors : MonoBehaviour
     [SerializeField] private AudioClip sndDoorOpen;
     private bool matchedPair = false;
 
+    private PlayerStep player;
+    private Collider2D wallCollider;
+
     void Start()
     {
         anim = GetComponent<Animator>();
+        player = FindObjectOfType<PlayerStep>();
+        wallCollider = doorWall != null ? doorWall.GetComponentInChildren<Collider2D>() : null;
     }
 
     void Update()
     {
-        if (doorPair.GetComponent<KeyDoors>().phase != 0 && !matchedPair) { phase = 1; matchedPair = true; }
+        if (doorPair.GetComponent<KeyDoors>().phase != 0 && !matchedPair)
+        {
+            phase = 1;
+            matchedPair = true;
+        }
 
         if (phase == 0)
         {
@@ -51,7 +59,9 @@ public class KeyDoors : MonoBehaviour
         }
 
         if (alarm1 > 0)
+        {
             alarm1 -= 1;
+        }
         else
         {
             if (phase == 1)
@@ -74,11 +84,13 @@ public class KeyDoors : MonoBehaviour
                         break;
                 }
 
+                player?.ForceExitCrawlIfOn(wallCollider);
                 phase = 2;
             }
         }
 
         AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
+
         if (phase == 2 && (stateInfo.IsName("RedDoorOpening") || stateInfo.IsName("BlueDoorOpening") || stateInfo.IsName("YellowDoorOpening") || stateInfo.IsName("GrayDoorOpening")) && stateInfo.normalizedTime >= 1f) { phase = 3; }
 
         if (phase == 3)

@@ -36,9 +36,7 @@ public class FireHydrant : MonoBehaviour
 
     private void OnTriggerStay2D(Collider2D other)
     {
-        AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
-
-        if (other.CompareTag("Web"))
+        if (other.CompareTag("Web") && !webbed)
         {
             webbed = true;
 
@@ -47,8 +45,10 @@ public class FireHydrant : MonoBehaviour
                 nearby.webbed = false;
             }
 
-            other.GetComponent<ShootScript>().audioSrc.PlayOneShot(other.GetComponent<ShootScript>().sndWebDestroy);
-            if (!other.GetComponent<ShootScript>().anim.GetCurrentAnimatorStateInfo(0).IsName("WebDestroy")) { other.GetComponent<ShootScript>().anim.Play("WebDestroy"); }
+            ShootScript shot = other.GetComponent<ShootScript>();
+
+            if (!shot.audioSrc.isPlaying) { shot.audioSrc.PlayOneShot(shot.sndWebDestroy); }
+            if (!shot.anim.GetCurrentAnimatorStateInfo(0).IsName("WebDestroy")) { shot.anim.Play("WebDestroy"); }
         }
     }
 }

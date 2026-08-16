@@ -1,6 +1,6 @@
 using TMPro;
 using UnityEngine;
-
+using UnityEngine.UI;
 
 [RequireComponent(typeof(RectTransform))]
 public class DialogueBox : MonoBehaviour
@@ -24,6 +24,21 @@ public class DialogueBox : MonoBehaviour
     [Header("Audio")]
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip dialogueSound;
+
+    [Header("Player Overlap Transparency")]
+    [Tooltip("Camera used to project the player's world position onto the screen. Defaults to Camera.main if left empty.")]
+    [SerializeField] private Camera playerViewCamera;
+    [Tooltip("Camera assigned to the Canvas rendering this UI. Leave empty if the Canvas is Screen Space - Overlay.")]
+    [SerializeField] private Camera canvasCamera;
+    [Range(0f, 1f)]
+    [SerializeField] private float overlapAlpha = 0.5f;
+    [Tooltip("How much alpha changes per frame while fading. Higher = faster fade.")]
+    [SerializeField] private float fadeSpeed = 0.05f;
+    private const float NORMAL_ALPHA = 1f;
+
+    private CanvasRenderer[] fadeRenderers;
+    private float currentAlpha = NORMAL_ALPHA;
+    private float targetAlpha = NORMAL_ALPHA;
 
     private float borderThickness = 2f;
     private Vector2 shadowOffset = new Vector2(10f, 10f);
@@ -71,6 +86,19 @@ public class DialogueBox : MonoBehaviour
             EnsureTopLeftPivot(dialogueText.rectTransform);
             dialogueText.fontSize = nativeFontSize * uiScale;
         }
+
+        if (playerViewCamera == null) playerViewCamera = Camera.main;
+
+        fadeRenderers = new[]
+        {
+            GetCanvasRenderer(boxRect),
+            GetCanvasRenderer(shadowRect),
+            GetCanvasRenderer(borderTop),
+            GetCanvasRenderer(borderBottom),
+            GetCanvasRenderer(borderLeft),
+            GetCanvasRenderer(borderRight),
+            dialogueText != null ? dialogueText.GetComponent<CanvasRenderer>() : null,
+        };
 
         text[0] = "Use the WASD keys to control Spidey. Press the\nSpace Bar to jump and again to web swing.";
         text[1] = "Use the 'O' key to attack! Use the 'P' key when\nyour spider sense goes off to block!";
@@ -175,9 +203,6 @@ public class DialogueBox : MonoBehaviour
                 }
                 break;
 
-
-
-
             case DialogueContext.BossFight:
                 {
                     if (dialogueNo == 0 && phase == -1)
@@ -221,9 +246,6 @@ public class DialogueBox : MonoBehaviour
                     }
                 }
                 break;
-
-
-
 
             case DialogueContext.Mission:
                 {
@@ -315,6 +337,49 @@ public class DialogueBox : MonoBehaviour
                 dialogueText.text = full.Substring(0, shown);
             }
         }
+
+        UpdateOverlapAlphaTarget(visible);
+        StepFade();
+    }
+
+    private void UpdateOverlapAlphaTarget(bool visible)
+    {
+        if (!visible || boxRect == null || playerTransform == null || fadeRenderers == null)
+        {
+            targetAlpha = NORMAL_ALPHA;
+            return;
+        }
+
+        Camera cam = playerViewCamera != null ? playerViewCamera : Camera.main;
+        if (cam == null)
+        {
+            targetAlpha = NORMAL_ALPHA;
+            return;
+        }
+
+        Vector2 playerScreenPos = cam.WorldToScreenPoint(playerTransform.position);
+        bool overlapping = RectTransformUtility.RectangleContainsScreenPoint(boxRect, playerScreenPos, canvasCamera);
+
+        targetAlpha = overlapping ? overlapAlpha : NORMAL_ALPHA;
+    }
+
+    private void StepFade()
+    {
+        currentAlpha = Mathf.MoveTowards(currentAlpha, targetAlpha, fadeSpeed);
+        SetAlpha(currentAlpha);
+    }
+
+    private void SetAlpha(float alpha)
+    {
+        foreach (var cr in fadeRenderers)
+        {
+            if (cr != null) cr.SetAlpha(alpha);
+        }
+    }
+
+    private static CanvasRenderer GetCanvasRenderer(RectTransform rt)
+    {
+        return rt != null ? rt.GetComponent<CanvasRenderer>() : null;
     }
 
     private static void SetRect(RectTransform rt, float left, float top, float right, float bottom)

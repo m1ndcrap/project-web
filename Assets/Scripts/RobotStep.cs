@@ -464,8 +464,9 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
                         float moveDir = Mathf.Sign(dirX);
                         bool hazardAhead = IsHazardAhead(moveDir, 0.6f, 0.9f);
                         bool ledgeAhead = !IsGroundAhead(moveDir, coll.bounds.extents.x + 0.3f);
+                        bool blockingAhead = IsBlockingObjectAhead(moveDir, 0.6f, 0.9f);
 
-                        if (hazardAhead || ledgeAhead)
+                        if (hazardAhead || ledgeAhead || blockingAhead)
                         {
                             normalVelX = 0f;
                             dirX = -dirX;
@@ -586,9 +587,9 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
                     bool playerBlocked = collidedWithPlayer && movingTowardPlayer && !player.IsPhysicallyPassable();
                     bool geometryBlocked = dirX != 0f && IsWallAhead(Mathf.Sign(dirX));
                     bool ledgeAheadAlert = dirX != 0f && !IsGroundAhead(Mathf.Sign(dirX), coll.bounds.extents.x + 0.3f);
+                    bool objectBlockedAlert = dirX != 0f && IsBlockingObjectAhead(Mathf.Sign(dirX), 0.6f, 0.9f);
 
-
-                    wallBlockedAlert = playerBlocked || geometryBlocked || ledgeAheadAlert;
+                    wallBlockedAlert = playerBlocked || geometryBlocked || ledgeAheadAlert || objectBlockedAlert;
 
                     if (wallBlockedAlert)
                         alertVelX = 0f;
@@ -675,7 +676,7 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
                         {
                             // Stop right here instead of running off the edge
                             evadeTimer = 0f;
-                            retargetGraceTimer = 0.15f;
+                            retargetGraceTimer = 0.05f;
                             rb.velocity = new Vector2(0f, rb.velocity.y);
                             sprite.flipX = (evadeDir > 0);
                         }
@@ -684,7 +685,7 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
                             evadeTimer -= Time.deltaTime;
 
                             if (evadeTimer <= 0f)
-                                retargetGraceTimer = 0.15f;
+                                retargetGraceTimer = 0.05f;
 
                             rb.velocity = new Vector2(evadeDir * hsp * 4.5f, rb.velocity.y);
                             sprite.flipX = (evadeDir > 0);
@@ -1085,7 +1086,7 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
 
     public void AttackEvent()
     {
-        if (Vector3.Distance(player.transform.position, transform.position) <= 0.45f) { player.Damage(this); }
+        if (Vector3.Distance(player.transform.position, transform.position) <= 0.55f) { player.Damage(this); }
     }
     public bool IsOnScreen(Camera cam)
     {
@@ -1214,9 +1215,47 @@ public class RobotStep : MonoBehaviour, IEnemyBarrier
         return Physics2D.Raycast(origin, new Vector2(dir, 0f), checkDistance, jumpableGround).collider != null;
     }
 
+    // Objects that are solid-looking but not on a physics-blocking layer, only obstruct while intact
+    private bool IsBlockingObjectAhead(float dir, float checkDistance = 1f, float heightTolerance = 1f)
+    {
+        Vector2 origin = rb.position;
+        Vector2 boxSize = new Vector2(checkDistance, heightTolerance);
+        Vector2 center = origin + new Vector2(dir * checkDistance * 0.5f, 0f);
+
+        Collider2D[] hits = Physics2D.OverlapBoxAll(center, boxSize, 0f);
+
+        foreach (var hit in hits)
+        {
+            if (hit.CompareTag("Car"))
+            {
+                Animator carAnim = hit.GetComponent<Animator>();
+
+                if (carAnim != null && carAnim.GetCurrentAnimatorStateInfo(0).IsName("CarNormal"))
+                    return true;
+            }
+            else if (hit.CompareTag("Door"))
+            {
+                BreakableDoor door = hit.GetComponent<BreakableDoor>();
+
+                if (door != null && door.phase == 0)
+                    return true;
+            }
+            else if (hit.CompareTag("RedKeyDoor") || hit.CompareTag("BlueKeyDoor") || hit.CompareTag("YellowKeyDoor"))
+            {
+                KeyDoors keyDoor = hit.GetComponent<KeyDoors>();
+
+                if (keyDoor != null && keyDoor.phase == 0)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
     private bool IsDirectionSafeToEvade(float dir)
     {
         if (IsHazardAhead(dir)) return false;
+        if (IsBlockingObjectAhead(dir)) return false;
         if (!IsGroundAhead(dir, 3f)) return false;
         return true;
     }

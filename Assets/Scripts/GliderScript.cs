@@ -162,13 +162,13 @@ public class GliderScript : MonoBehaviour
                 {
                     moving = false;
                     float spd = Mathf.Lerp(0, 6, Mathf.Abs(transform.position.x - player.transform.position.x) / 150f);
+                    xOff = 1.56f;
 
-                    if (Input.GetAxisRaw("Horizontal") != 0f)
-                        xOff = 0.956f;
-                    else
-                        xOff = 4.6f;
+                    float horizDist = Mathf.Abs(transform.position.x - player.transform.position.x);
+                    float crossBoost = Mathf.Lerp(2.5f, 0f, Mathf.Clamp01(horizDist / Mathf.Abs(xOff)));
 
-                    transform.position = Vector2.MoveTowards(transform.position, new Vector2(player.transform.position.x + (xOff * xOffDir), player.transform.position.y + 1.2f), spd * Time.deltaTime * 60f);
+                    Vector2 throwTarget = new Vector2(player.transform.position.x + (xOff * xOffDir), player.transform.position.y + 1.2f + crossBoost);
+                    transform.position = Vector2.MoveTowards(transform.position, throwTarget, spd * Time.deltaTime * 60f);
                     sr.flipX = player.transform.position.x < transform.position.x;
                 }
                 break;

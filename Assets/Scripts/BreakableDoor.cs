@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
 public class BreakableDoor : MonoBehaviour
 {
     public int phase = 0;
@@ -14,9 +13,14 @@ public class BreakableDoor : MonoBehaviour
     [SerializeField] private string breakAnim;
     private int alarm1 = 0;
 
+    private PlayerStep player;
+    private Collider2D wallCollider;
+
     void Start()
     {
         anim = GetComponent<Animator>();
+        player = FindObjectOfType<PlayerStep>();
+        wallCollider = doorWall != null ? doorWall.GetComponentInChildren<Collider2D>() : null;
     }
 
     void Update()
@@ -39,6 +43,7 @@ public class BreakableDoor : MonoBehaviour
             {
                 anim.Play(breakAnim);
                 SfxPlayer.Instance.PlayClipAtPointMatched(sndBreak, transform.position);
+                player?.ForceExitCrawlIfOn(wallCollider);
                 phase = 2;
             }
         }

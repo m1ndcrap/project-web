@@ -12,6 +12,7 @@ public class PumpkinProjectile : MonoBehaviour
     [SerializeField] public Animator animator;
     [SerializeField] public AudioClip pumpkinBoom;
     [SerializeField] public bool airborne = false;
+    private bool hasDealtDamage = false;
     public int dir = 1;
     float i = 0;
     bool ready = false;
@@ -60,30 +61,21 @@ public class PumpkinProjectile : MonoBehaviour
         }
         else
         {
-            if (!ready)
-            {
-                i = -(int)(Mathf.Abs(targX - xstart) / 2f);
-                ready = true;
-            }
+            float dist = Mathf.Abs(targX - xstart);
+            float halfSpan = dist / 2f;
+            float travelSpeed = 5.4f;
 
-            float halfSpan = Mathf.Abs(targX - xstart) / 2f;
-            float t = halfSpan > 0f ? Mathf.InverseLerp(-halfSpan, halfSpan, i) : 1f;
-            float baseline = Mathf.Lerp(ystart, targY, t);
+            i += travelSpeed * Time.deltaTime;
+            float t = dist > 0f ? i / dist : 1f;
+
             float arcHeight = Mathf.Max(0.6f, halfSpan * 0.35f);
+            float arc = arcHeight * 4f * t * (1f - t);
 
-            pos.y = baseline + arcHeight - (arcHeight / (halfSpan * halfSpan + 0.001f)) * (i * i);
-            i += 0.1f;
+            pos.x = Mathf.LerpUnclamped(xstart, targX, t);
+            pos.y = Mathf.LerpUnclamped(ystart, targY, t) + arc;
 
-            if (xstart > targX)
-            {
-                pos.x -= 0.1f * Time.deltaTime * 60f;
-                transform.Rotate(0, 0, 2f);
-            }
-            else
-            {
-                pos.x += 0.1f * Time.deltaTime * 60f;
-                transform.Rotate(0, 0, -2f);
-            }
+            float rotDir = xstart > targX ? 1f : -1f;
+            transform.Rotate(0, 0, 2f * rotDir * Time.deltaTime * 60f);
         }
 
         transform.position = pos;
@@ -115,31 +107,34 @@ public class PumpkinProjectile : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D other)
     {
-        if (phase != 0) return;
-
         if (other.CompareTag("Player"))
         {
-            if (player.pState == PlayerStep.PlayerState.death) return;
+            if (!hasDealtDamage && player.pState != PlayerStep.PlayerState.death)
+            {
+                hasDealtDamage = true;
 
-            float dir = 0;
-            dir = (transform.position.x < player.transform.position.x) ? 1f : -1f;
+                float dir = (transform.position.x < player.transform.position.x) ? 1f : -1f;
 
-            player.rb.velocity = new Vector2(dir * 2f, 5f);
-            player.anim.speed = 1f;
-            player.combo = 0;
-            player.pState = PlayerStep.PlayerState.hurt;
+                player.rb.velocity = new Vector2(dir * 2f, 5f);
+                player.anim.speed = 1f;
+                player.combo = 0;
+                player.pState = PlayerStep.PlayerState.hurt;
 
-            PlayerStep.MovementState mstate = PlayerStep.MovementState.launched;
-            player.anim.SetInteger("mstate", (int)mstate);
+                PlayerStep.MovementState mstate = PlayerStep.MovementState.launched;
+                player.launchGroundGrace = 0.2f;
+                player.launchTechTimer = 0f;
+                player.anim.SetInteger("mstate", (int)mstate);
 
-            player.health -= 3;
-            player.healthbar.UpdateHealthBar(player.health, player.maxHealth);
+                player.health -= 3;
+                player.healthbar.UpdateHealthBar(player.health, player.maxHealth);
 
-            AudioClip[] clips = { player.sndHurt, player.sndHurt2, player.sndHurt3 };
-            player.audioSrc.PlayOneShot(clips[Random.Range(0, clips.Length)]);
+                AudioClip[] clips = { player.sndHurt, player.sndHurt2, player.sndHurt3 };
+                player.audioSrc.PlayOneShot(clips[Random.Range(0, clips.Length)]);
 
-            AudioClip[] clips2 = { goblin.sndGLaugh1, goblin.sndGLaugh2, goblin.sndGLaugh3 };
-            goblin.audioSrc.PlayOneShot(clips2[Random.Range(0, clips2.Length)]);
+                AudioClip[] clips2 = { goblin.sndGLaugh1, goblin.sndGLaugh2, goblin.sndGLaugh3 };
+                goblin.audioSrc.PlayOneShot(clips2[Random.Range(0, clips2.Length)]);
+            }
+
             TriggerExplosion();
         }
         else if (other.CompareTag("Ground"))
