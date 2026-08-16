@@ -40,72 +40,74 @@ public class ShootScript : MonoBehaviour
 
         if (other.CompareTag("Ground") || other.CompareTag("CarSolid"))
         {
-            if (!audioSrc.isPlaying)
-                audioSrc.PlayOneShot(sndWebDestroy);
-
+            if (!audioSrc.isPlaying) { audioSrc.PlayOneShot(sndWebDestroy); }
             if (!stateInfo.IsName("WebDestroy")) { anim.Play("WebDestroy"); }
         }
-        
+
         if (other.CompareTag("Enemy"))
         {
             RobotStep enemy = other.GetComponent<RobotStep>();
+
+            if (enemy.eState == RobotStep.EnemyState.death)
+                return;
+
             enemy.eState = RobotStep.EnemyState.webbed;
             enemy.alarm7 = 30;
             enemy.anim.SetInteger("mstate", 13);
             enemy.alarm5 = 240;
 
-            if (!audioSrc.isPlaying)
-                audioSrc.PlayOneShot(sndWebDestroy);
-
+            if (!audioSrc.isPlaying) { audioSrc.PlayOneShot(sndWebDestroy); }
             player.alarm3 = 300;
+
             if (!stateInfo.IsName("WebDestroy")) { anim.Play("WebDestroy"); }
         }
 
         if (other.CompareTag("Goblin"))
         {
             GoblinStep goblin = other.GetComponent<GoblinStep>();
+
+            if (goblin.gState == GoblinStep.GoblinState.death)
+                return;
+
             goblin.blocking = false;
 
-            if (goblin.gState != GoblinStep.GoblinState.death)
+            float dir = transform.position.x < other.transform.position.x ? 1f : -1f;
+
+            if (goblin.gState != GoblinStep.GoblinState.on_glider)
             {
-                float dir = transform.position.x < other.transform.position.x ? 1f : -1f;
+                goblin.rb.velocity = new Vector2(0f, 0f);
+                goblin.anim.speed = 1;
+                goblin.gState = GoblinStep.GoblinState.getting_hit;
 
-                if (goblin.gState != GoblinStep.GoblinState.on_glider)
-                {
-                    goblin.rb.velocity = new Vector2(0f, 0f);
-                    goblin.anim.speed = 1;
-                    goblin.gState = GoblinStep.GoblinState.getting_hit;
+                GoblinStep.MovementState mstate;
+                int hitIndex = Random.Range(0, 2); // 0 or 1
 
-                    GoblinStep.MovementState mstate;
-                    int hitIndex = Random.Range(0, 2); // 0 or 1
+                if (hitIndex == 0)
+                    mstate = GoblinStep.MovementState.breakweb1;
+                else
+                    mstate = GoblinStep.MovementState.breakweb1;
 
-                    if (hitIndex == 0)
-                        mstate = GoblinStep.MovementState.breakweb1;
-                    else
-                        mstate = GoblinStep.MovementState.breakweb1;
-
-                    goblin.anim.SetInteger("mstate", (int)mstate);
-                }
+                goblin.anim.SetInteger("mstate", (int)mstate);
             }
 
-            if (!audioSrc.isPlaying)
-                audioSrc.PlayOneShot(sndWebDestroy);
-
+            if (!audioSrc.isPlaying) { audioSrc.PlayOneShot(sndWebDestroy); }
             if (!stateInfo.IsName("WebDestroy")) { anim.Play("WebDestroy"); }
         }
 
-        if(other.CompareTag("Shocker"))
+        if (other.CompareTag("Shocker"))
         {
             ShockerStep shocker = other.GetComponent<ShockerStep>();
+
+            if (shocker.sState == ShockerStep.ShockerState.death)
+                return;
+
             GameObject shockwave = Instantiate(shocker.shockwavePrefab, shocker.transform.position, Quaternion.identity);
             shockwave.GetComponent<Shockwave>().type = 0;
             shocker.audioSrc.PlayOneShot(shocker.sndShockwaveBlast);
             player.trigger = true;
             player.alarm4 = 60;
 
-            if (!audioSrc.isPlaying)
-                audioSrc.PlayOneShot(sndWebDestroy);
-
+            if (!audioSrc.isPlaying) { audioSrc.PlayOneShot(sndWebDestroy); }
             if (!stateInfo.IsName("WebDestroy")) { anim.Play("WebDestroy"); }
         }
     }
