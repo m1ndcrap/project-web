@@ -9,6 +9,8 @@ public class ExplosiveScript : MonoBehaviour
     private AudioSource audioSrc;
     [SerializeField] private AudioClip sndExplosion1;
     [SerializeField] private AudioClip sndExplosion2;
+    [SerializeField] private AudioClip sndBigExplosion;
+    private bool bigExplosionTriggered = false;
     private int alarm1 = 0;
     [SerializeField] private bool createAnotherTrigger = false;
     [SerializeField] private GameObject nextTrigger;
@@ -118,6 +120,13 @@ public class ExplosiveScript : MonoBehaviour
             {
                 AnimatorStateInfo explosionStateInfo = explosionAnimator.GetCurrentAnimatorStateInfo(0);
                 explosionAnimator.Play("ExplosionBig");
+
+                if (!bigExplosionTriggered)
+                {
+                    audioSrc.PlayOneShot(sndBigExplosion);
+                    bigExplosionTriggered = true;
+                }
+
                 float normalizedTime = stateInfo.normalizedTime;
                 float scaleProgress = Mathf.Clamp01(normalizedTime);
                 float currentScale = 1f + (explosionScaleMultiplier * scaleProgress);

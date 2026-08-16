@@ -67,6 +67,8 @@ public class ObjectiveTrigger : MonoBehaviour
     private float panProgress = 0f;
     private float panDuration = 1.5f;
     private CameraController cameraController;
+    private bool cameraPinned = false;
+    private Vector3 cameraPinnedPos;
 
     private Cinemachine.CinemachineVirtualCamera virtualCamera;
 
@@ -74,6 +76,8 @@ public class ObjectiveTrigger : MonoBehaviour
     public bool chasing = true;
 
     public bool intensityThree = false;
+
+    private Vector3 shockerPanTargetPos;
 
     void Start()
     {
@@ -187,6 +191,22 @@ public class ObjectiveTrigger : MonoBehaviour
                             cameraController.followPlayer = false;
                         }
                     }
+                    else if (missionType == 3 && chaseTarget != null && chaseTarget.sState != ShockerStep.ShockerState.death)
+                    {
+                        Debug.Log("shocker escaped");
+                        timerFailed = true;
+                        timerActive = false;
+                        cameraPanning = true;
+                        panProgress = 0f;
+
+                        shockerPanTargetPos = chaseTarget.transform.position;
+
+                        if (cameraController != null)
+                        {
+                            originalCameraPos = Camera.main.transform.position;
+                            cameraController.followPlayer = false;
+                        }
+                    }
                 }
                 else
                 {
@@ -211,7 +231,7 @@ public class ObjectiveTrigger : MonoBehaviour
             {
                 alarm6 -= 1;
             }
-            else
+            else if (missionType == 4 && missionObjective != null)
             {
                 missionObjective.GetComponent<ExplosiveScript>().bigExplosion = true;
             }
@@ -530,22 +550,45 @@ public class ObjectiveTrigger : MonoBehaviour
             uiTimer.canvasRenderer.SetAlpha(0);
         }
 
-        if (cameraPanning && missionType == 4 && missionObjective != null)
+        if (cameraPanning && ((missionType == 4 && missionObjective != null) || (missionType == 3 && chaseTarget != null)))
         {
             player.stopMove = true;
             panProgress += Time.deltaTime / panDuration;
 
+            Vector3 panTargetPos = missionType == 4 ? missionObjective.transform.position : shockerPanTargetPos;
+            Vector3 targetPos = new Vector3(panTargetPos.x, panTargetPos.y, originalCameraPos.z);
+
             if (panProgress >= 1f)
             {
                 cameraPanning = false;
+
+                if (missionType == 3)
+                {
+                    cameraPinned = true;
+                    cameraPinnedPos = targetPos;
+                }
+
+                if (missionType == 3 && chaseTarget != null && !chaseTarget.forceRunAway)
+                    chaseTarget.forceRunAway = true;
+
                 if (!startAlarm5) { startAlarm5 = true; alarm5 = 300; alarm6 = 200; }
             }
-            else if (virtualCamera == null && cameraController != null)
+            else if (missionType == 4 && virtualCamera != null)
             {
-                Vector3 targetPos = new Vector3(missionObjective.transform.position.x, missionObjective.transform.position.y, originalCameraPos.z);
+                // explosive keeps its existing Cinemachine-follow behavior
+            }
+            else
+            {
                 float easedProgress = Mathf.SmoothStep(0f, 1f, panProgress);
                 Camera.main.transform.position = Vector3.Lerp(originalCameraPos, targetPos, easedProgress);
             }
+        }
+
+        // Keep the camera locked here every frame after the pan finishes, independent of cameraPanning
+        if (cameraPinned)
+        {
+            player.stopMove = true;
+            Camera.main.transform.position = cameraPinnedPos;
         }
 
         if (completed && !done)

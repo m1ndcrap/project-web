@@ -109,6 +109,8 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
     [SerializeField] private GameObject barrier1;
     [SerializeField] private GameObject barrier2;
 
+    public bool forceRunAway = false;
+
     // Arena bounds
     private float arenaLeftBound = 125.657f;
     private float arenaRightBound = 130.492f;
@@ -180,6 +182,17 @@ public class ShockerStep : MonoBehaviour, IEnemyBarrier
 
     void Update()
     {
+        if (forceRunAway)
+        {
+            dirX = 1f;
+            sprite.flipX = false;
+            rb.velocity = new Vector2(2.75f, rb.velocity.y);
+            rb.gravityScale = 1f;
+            anim.speed = 1f;
+            anim.SetInteger("mstate", (int)MovementState.sprinting);
+            return;
+        }
+
         distanceFromPlayer = Vector3.Distance(player.transform.position, transform.position);
         bool noHitWall = !Physics2D.Raycast(transform.position, (player.transform.position - transform.position).normalized, distanceFromPlayer, jumpableGround);
 
