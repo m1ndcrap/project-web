@@ -202,6 +202,7 @@ public class PlayerStep : MonoBehaviour
     private float attackCooldownDuration = 0.6f;    // minimum time between attack starts
     private float airAttackCooldownDuration = 0.52f; // minimum time between air kicks specifically
     private float launchedFreezeTimer = 0f;
+    private float launchGroundGrace = 0f;
 
     // Unified combat target, can be a robot, goblin, or shocker
     private Component currentCombatTarget = null;
@@ -464,6 +465,7 @@ public class PlayerStep : MonoBehaviour
 
         if (senseSoundTimer > 0) senseSoundTimer -= Time.deltaTime;
         if (attackCooldown > 0f) attackCooldown -= Time.deltaTime;
+        if (launchGroundGrace > 0f) launchGroundGrace -= Time.deltaTime;
 
         Debug.Log(1 / Time.unscaledDeltaTime); // FPS counter
         AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
@@ -2044,7 +2046,7 @@ public class PlayerStep : MonoBehaviour
                         if (stateInfo.normalizedTime >= 1f)
                             anim.speed = 0f;
 
-                        if (Grounded())
+                        if (Grounded() && launchGroundGrace <= 0f)
                         {
                             anim.speed = 1f;
                             pState = PlayerState.normal;
@@ -3225,6 +3227,7 @@ public class PlayerStep : MonoBehaviour
         if (isKick)
         {
             mstate = MovementState.launched;
+            launchGroundGrace = 0.2f;
             AudioClip[] clips = { sndStrongHit, sndStrongHit2 };
             audioSrc.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)]);
         }
@@ -3573,6 +3576,7 @@ public class PlayerStep : MonoBehaviour
             pState = PlayerState.hurt;
 
             anim.SetInteger("mstate", (int)MovementState.launched);
+            launchGroundGrace = 0.2f;
             enemyHitSpawn = collision.transform.position;
             SpawnHurtEffect(transform.position);
 
@@ -3661,6 +3665,7 @@ public class PlayerStep : MonoBehaviour
             pState = PlayerState.hurt;
 
             anim.SetInteger("mstate", (int)MovementState.launched);
+            launchGroundGrace = 0.2f;
             enemyHitSpawn = collision.transform.position;
             SpawnHurtEffect(transform.position);
 
@@ -3702,6 +3707,7 @@ public class PlayerStep : MonoBehaviour
             pState = PlayerState.hurt;
 
             anim.SetInteger("mstate", (int)MovementState.launched);
+            launchGroundGrace = 0.2f;
             enemyHitSpawn = collision.transform.position;
             SpawnHurtEffect(transform.position);
 
@@ -3743,6 +3749,7 @@ public class PlayerStep : MonoBehaviour
             pState = PlayerState.hurt;
 
             anim.SetInteger("mstate", (int)MovementState.launched);
+            launchGroundGrace = 0.2f;
             enemyHitSpawn = collision.transform.position;
             SpawnHurtEffect(transform.position);
 
