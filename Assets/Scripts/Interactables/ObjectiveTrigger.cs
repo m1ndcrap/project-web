@@ -1,0 +1,647 @@
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+
+
+/// <summary>
+/// Handles the triggering and management of mission objectives.
+/// </summary>
+
+
+public class ObjectiveTrigger : MonoBehaviour
+{
+    [SerializeField] public int missionType;   // 1 for hostage rescue, 2 for beat all enemies in area, 3 for chasing, 4 for destroying object
+    [SerializeField] public GameObject missionObjective; // for hostage rescue/destroying object
+    [SerializeField] private List<GameObject> missionList; // for beating all enemies
+    [SerializeField] private GameObject bgmController;
+    [SerializeField] private List<GameObject> barriers;
+    
+
+    [SerializeField] private Image uiStart;
+    [SerializeField] private Image uiArrow;
+    [SerializeField] private Image uiFound;
+    [SerializeField] private Image uiBG;
+    [SerializeField] private Image uiIcons;
+    [SerializeField] private Image uiComplete;
+    [SerializeField] private Image uiTimer;
+
+
+    [SerializeField] private Sprite[] sprTimerStart;
+    [SerializeField] private Sprite[] sprTimerFound;
+    [SerializeField] private Sprite[] sprTimer;
+    [SerializeField] private Sprite sprTimerArrow;
+    [SerializeField] private Sprite sprTimerBG;
+    [SerializeField] private Sprite[] sprTimerComplete;
+    [SerializeField] private Sprite[] sprTimerIcons;
+
+
+    private PlayerStep player;
+
+
+    /// <summary>True once this objective has been triggered. PlayerStep reads this to avoid re-activating an objective that is already running.</summary>
+    public bool active = false;
+
+
+    public bool countdown = false;
+    public bool start = false;
+    private bool found = false;
+    private bool completed = false;
+    public bool done = false;
+
+
+    private int indexS = 0;
+    private int indexF = 0;
+    private int indexC = 0;
+
+
+    private bool animateS = true;
+    private bool animateF = true;
+    private bool animateC = true;
+
+
+    [SerializeField] private RectTransform uiParent;
+
+
+    private int alarm1 = 0;
+    private int alarm2 = 0;
+    private int alarm3 = 0;
+    private int alarm4 = 0;
+    private int alarm5 = 0;
+    private int alarm6 = 0;
+    private bool startAlarm5 = false;
+
+
+    private GameObject closestEnemy = null;
+
+
+    private int timerIndex = 0;
+    private bool animateTimer = true;
+    private bool timerActive = false;
+    private bool timerFailed = false;
+
+
+    private bool cameraPanning = false;
+    private Vector3 originalCameraPos;
+    private float panProgress = 0f;
+    private float panDuration = 1.5f;
+    private CameraController cameraController;
+    private bool cameraPinned = false;
+    private Vector3 cameraPinnedPos;
+
+
+    private Cinemachine.CinemachineVirtualCamera virtualCamera;
+
+
+    [SerializeField] private ShockerStep chaseTarget;
+    public bool chasing = true;
+
+
+    public bool intensityThree = false;
+
+
+    private Vector3 shockerPanTargetPos;
+
+
+
+
+    void Start()
+    {
+        player = FindObjectOfType<PlayerStep>();
+        cameraController = Camera.main.GetComponent<CameraController>();
+        virtualCamera = FindObjectOfType<Cinemachine.CinemachineVirtualCamera>();
+        uiStart.canvasRenderer.SetAlpha(0);
+        uiArrow.canvasRenderer.SetAlpha(0);
+        uiFound.canvasRenderer.SetAlpha(0);
+        uiTimer.canvasRenderer.SetAlpha(0);
+        uiComplete.canvasRenderer.SetAlpha(0);
+        uiBG.canvasRenderer.SetAlpha(0);
+        uiIcons.canvasRenderer.SetAlpha(0);
+        uiParent.anchoredPosition = new Vector2(0, 171);
+
+        foreach (GameObject b in barriers)
+        {
+            if (b != null) b.SetActive(false);
+        }
+    }
+
+
+
+
+    void Update()
+    {
+        if (alarm1 > 0)
+        {
+            alarm1 -= 1;
+        }
+        else
+        {
+            if (start)
+            {
+                if (indexS >= 19)
+                {
+                    start = false;
+                }
+                else
+                {
+                    indexS++;
+                    animateS = true;
+                }
+            }
+        }
+
+        if (alarm2 > 0)
+        {
+            alarm2 -= 1;
+        }
+        else
+        {
+            if (found)
+            {
+                if (indexF >= 12)
+                {
+                    indexF = 0;
+                }
+                else
+                {
+                    indexF++;
+                }
+            }
+
+            animateF = true;
+        }
+
+        if (alarm3 > 0)
+        {
+            alarm3 -= 1;
+        }
+        else
+        {
+            if (completed)
+            {
+                if (indexC >= 20)
+                {
+                    done = true;
+                    completed = false;
+                }
+                else
+                {
+                    indexC++;
+                    animateC = true;
+                }
+            }
+        }
+
+        if (alarm4 > 0)
+        {
+            alarm4 -= 1;
+        }
+        else
+        {
+            if (timerActive && !timerFailed)
+            {
+                if (timerIndex >= 31)
+                {
+                    if (missionType == 4 && missionObjective != null && missionObjective.GetComponent<ExplosiveScript>().phase == 0)
+                    {
+                        timerFailed = true;
+                        timerActive = false;
+                        cameraPanning = true;
+                        panProgress = 0f;
+
+                        if (virtualCamera != null && missionObjective != null)
+                        {
+                            virtualCamera.Follow = missionObjective.transform;
+                        }
+                        else if (cameraController != null)
+                        {
+                            originalCameraPos = Camera.main.transform.position;
+                            cameraController.followPlayer = false;
+                        }
+                    }
+                    else if (missionType == 3 && chaseTarget != null && chaseTarget.sState != ShockerStep.ShockerState.death)
+                    {
+                        timerFailed = true;
+                        timerActive = false;
+                        cameraPanning = true;
+                        panProgress = 0f;
+
+                        shockerPanTargetPos = chaseTarget.transform.position;
+
+                        if (cameraController != null)
+                        {
+                            originalCameraPos = Camera.main.transform.position;
+                            cameraController.followPlayer = false;
+                        }
+                    }
+                }
+                else
+                {
+                    timerIndex++;
+                    animateTimer = true;
+                }
+            }
+        }
+
+        if (startAlarm5)
+        {
+            if (alarm5 > 0)
+            {
+                alarm5 -= 1;
+            }
+            else
+            {
+                SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+            }
+
+            if (alarm6 > 0)
+            {
+                alarm6 -= 1;
+            }
+            else if (missionType == 4 && missionObjective != null)
+            {
+                missionObjective.GetComponent<ExplosiveScript>().bigExplosion = true;
+            }
+        }
+
+        if (countdown)
+        {
+            uiBG.sprite = sprTimerBG;
+            uiBG.rectTransform.anchoredPosition = Vector2.zero;
+            uiBG.canvasRenderer.SetAlpha(1);
+            uiIcons.canvasRenderer.SetAlpha(1);
+            uiArrow.rectTransform.anchoredPosition = Vector2.zero;
+            uiArrow.sprite = sprTimerArrow;
+
+            Vector2 objScreenPos = new Vector2();
+
+            if (missionType == 1 || missionType == 4)
+                objScreenPos = Camera.main.WorldToScreenPoint(missionObjective.transform.position);
+            else if (missionType == 2 && closestEnemy != null)
+                objScreenPos = Camera.main.WorldToScreenPoint(closestEnemy.transform.position);
+            else if (missionType == 3)
+                objScreenPos = Camera.main.WorldToScreenPoint(chaseTarget.transform.position);
+
+            Vector2 objLocalPos;
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(uiArrow.rectTransform.parent as RectTransform, objScreenPos, null, out objLocalPos);
+            Vector2 dir = objLocalPos - (Vector2)uiArrow.rectTransform.localPosition;
+            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+            uiArrow.rectTransform.localRotation = Quaternion.Euler(0, 0, angle);
+
+            foreach (GameObject b in barriers)
+            {
+                if (b != null) b.SetActive(true);
+            }
+
+            if (missionType == 1)
+                uiIcons.sprite = sprTimerIcons[2];
+            else if (missionType == 2 || missionType == 4)
+                uiIcons.sprite = sprTimerIcons[1];
+            else
+                uiIcons.sprite = sprTimerIcons[0];
+
+            uiIcons.rectTransform.anchoredPosition = Vector2.zero;
+
+            if (SceneManager.GetActiveScene().name != "Test")
+                bgmController.GetComponent<BGMController>().intensity = 1;
+
+            if (missionType == 4 && !timerActive && !timerFailed && missionObjective != null && missionObjective.GetComponent<ExplosiveScript>().phase == 0)
+            {
+                timerActive = true;
+                timerIndex = 0;
+                animateTimer = true;
+                uiTimer.rectTransform.anchoredPosition = Vector2.zero;
+                uiTimer.canvasRenderer.SetAlpha(1);
+            }
+
+            if (missionType == 3 && !timerActive && !timerFailed)
+            {
+                timerActive = true;
+                timerIndex = 0;
+                animateTimer = true;
+                uiTimer.rectTransform.anchoredPosition = Vector2.zero;
+                uiTimer.canvasRenderer.SetAlpha(1);
+            }
+
+            if (missionType == 1)
+            {
+                if (missionObjective.GetComponent<HostageScript>().phase == 0)
+                {
+                    if (Vector3.Distance(player.transform.position, missionObjective.transform.position) < 2f)
+                    {
+                        found = true;
+                        uiArrow.canvasRenderer.SetAlpha(0);
+                        uiFound.canvasRenderer.SetAlpha(1);
+                    }
+                    else
+                    {
+                        found = false;
+                        indexF = 0;
+                        animateF = false;
+                        alarm2 = 0;
+                        uiArrow.canvasRenderer.SetAlpha(1);
+                        uiFound.canvasRenderer.SetAlpha(0);
+                    }
+                }
+            }
+            else if (missionType == 2)
+            {
+                int numAlive = 0;
+                GameObject closest = null;
+                float closestDist = Mathf.Infinity;
+
+                Vector3 playerPos = player.transform.position;
+
+                foreach (GameObject e in missionList)
+                {
+                    if (e != null)
+                    {
+                        RobotStep rs = e.GetComponent<RobotStep>();
+
+                        if (rs.eState != RobotStep.EnemyState.death)
+                        {
+                            numAlive++;
+
+                            float dist = Vector3.Distance(playerPos, e.transform.position);
+
+                            if (dist < closestDist)
+                            {
+                                closestDist = dist;
+                                closest = e;
+                            }
+                        }
+                    }
+                }
+
+                if (numAlive > 0 && closest != null)
+                {
+                    if (closestDist < 2f)
+                    {
+                        found = true;
+                        uiArrow.canvasRenderer.SetAlpha(0);
+                        uiFound.canvasRenderer.SetAlpha(1);
+                    }
+                    else
+                    {
+                        found = false;
+                        indexF = 0;
+                        animateF = false;
+                        alarm2 = 0;
+
+                        uiArrow.canvasRenderer.SetAlpha(1);
+                        uiFound.canvasRenderer.SetAlpha(0);
+                    }
+
+                    closestEnemy = closest;
+                }
+                else
+                {
+                    found = false;
+                    uiArrow.canvasRenderer.SetAlpha(0);
+                    uiFound.canvasRenderer.SetAlpha(0);
+                }
+
+            }
+            else if (missionType == 3)
+            {
+                if (Vector2.Distance(chaseTarget.transform.position, player.transform.position) < 4.8f)
+                {
+                    found = true;
+                    uiArrow.canvasRenderer.SetAlpha(0);
+                    uiFound.canvasRenderer.SetAlpha(0);
+                }
+                else
+                {
+                    found = false;
+                    indexF = 0;
+                    animateF = false;
+                    alarm2 = 0;
+                    uiArrow.canvasRenderer.SetAlpha(1);
+                    uiFound.canvasRenderer.SetAlpha(0);
+                }
+            }
+            else if (missionType == 4)
+            {
+                if (missionObjective.GetComponent<ExplosiveScript>().phase == 0)
+                {
+                    if (Vector3.Distance(player.transform.position, missionObjective.transform.position) < 2f)
+                    {
+                        found = true;
+                        uiArrow.canvasRenderer.SetAlpha(0);
+                        uiFound.canvasRenderer.SetAlpha(1);
+                    }
+                    else
+                    {
+                        found = false;
+                        indexF = 0;
+                        animateF = false;
+                        alarm2 = 0;
+                        uiArrow.canvasRenderer.SetAlpha(1);
+                        uiFound.canvasRenderer.SetAlpha(0);
+                    }
+                }
+            }
+
+        }
+
+        if (missionType == 1 && !done)
+        {
+            if (missionObjective.GetComponent<HostageScript>().phase != 0)
+            {
+                countdown = false;
+
+                if (SceneManager.GetActiveScene().name != "Test")
+                    bgmController.GetComponent<BGMController>().intensity = 0;
+
+                completed = true;
+                uiStart.canvasRenderer.SetAlpha(0);
+                uiArrow.canvasRenderer.SetAlpha(0);
+                uiFound.canvasRenderer.SetAlpha(0);
+                uiTimer.canvasRenderer.SetAlpha(0);
+                uiBG.canvasRenderer.SetAlpha(0);
+                uiIcons.canvasRenderer.SetAlpha(0);
+            }
+        }
+
+        if (missionType == 2 && !done)
+        {
+            int numAlive = 0;
+
+            foreach (GameObject e in missionList)
+            {
+                if (e != null)
+                {
+                    if (e.GetComponent<RobotStep>().eState != RobotStep.EnemyState.death)
+                        numAlive++;
+                }
+            }
+
+            if (numAlive == 0)
+            {
+                countdown = false;
+
+                if (SceneManager.GetActiveScene().name != "Test")
+                    bgmController.GetComponent<BGMController>().intensity = 0;
+
+                completed = true;
+                uiStart.canvasRenderer.SetAlpha(0);
+                uiArrow.canvasRenderer.SetAlpha(0);
+                uiFound.canvasRenderer.SetAlpha(0);
+                uiTimer.canvasRenderer.SetAlpha(0);
+                uiBG.canvasRenderer.SetAlpha(0);
+                uiIcons.canvasRenderer.SetAlpha(0);
+            }
+        }
+
+        if (missionType == 3 && !done)
+        {
+            if ((chaseTarget.GetComponent<ShockerStep>().sState != ShockerStep.ShockerState.chase) || !chasing)
+            {
+                countdown = false;
+
+                if (!intensityThree)
+                    bgmController.GetComponent<BGMController>().intensity = 0;
+                else
+                    bgmController.GetComponent<BGMController>().intensity = 2;
+
+                completed = true;
+                timerActive = false;
+                uiStart.canvasRenderer.SetAlpha(0);
+                uiArrow.canvasRenderer.SetAlpha(0);
+                uiFound.canvasRenderer.SetAlpha(0);
+                uiTimer.canvasRenderer.SetAlpha(0);
+                uiBG.canvasRenderer.SetAlpha(0);
+                uiIcons.canvasRenderer.SetAlpha(0);
+            }
+        }
+
+        if (missionType == 4 && !done)
+        {
+            if (missionObjective.GetComponent<ExplosiveScript>().phase != 0 && missionObjective.GetComponent<ExplosiveScript>().phase != 4)
+            {
+                countdown = false;
+                bgmController.GetComponent<BGMController>().intensity = 0;
+                completed = true;
+                timerActive = false;
+                uiStart.canvasRenderer.SetAlpha(0);
+                uiArrow.canvasRenderer.SetAlpha(0);
+                uiFound.canvasRenderer.SetAlpha(0);
+                uiTimer.canvasRenderer.SetAlpha(0);
+                uiBG.canvasRenderer.SetAlpha(0);
+                uiIcons.canvasRenderer.SetAlpha(0);
+            }
+        }
+
+        if (start)
+        {
+            uiStart.canvasRenderer.SetAlpha(1);
+            uiStart.sprite = sprTimerStart[indexS];
+            uiStart.rectTransform.anchoredPosition = new Vector2(-1.2f, -1.3f);
+
+            if (animateS)
+            {
+                alarm1 = 1;
+                animateS = false;
+            }
+        }
+
+        if (!start) uiStart.canvasRenderer.SetAlpha(0);
+
+        if (found)
+        {
+            uiFound.rectTransform.anchoredPosition = Vector2.zero;
+            uiFound.sprite = sprTimerFound[indexF];
+
+            if (animateF)
+            {
+                alarm2 = 2;
+                animateF = false;
+            }
+        }
+
+        if ((missionType == 4 || missionType == 3) && timerActive && !timerFailed && timerIndex < sprTimer.Length)
+        {
+            uiTimer.canvasRenderer.SetAlpha(1);
+            uiTimer.sprite = sprTimer[timerIndex];
+            uiTimer.rectTransform.anchoredPosition = Vector2.zero;
+
+            if (animateTimer)
+            {
+                alarm4 = 40;
+                animateTimer = false;
+            }
+        }
+
+        if (timerFailed)
+        {
+            uiTimer.canvasRenderer.SetAlpha(0);
+        }
+
+        if (cameraPanning && ((missionType == 4 && missionObjective != null) || (missionType == 3 && chaseTarget != null)))
+        {
+            player.stopMove = true;
+            panProgress += Time.deltaTime / panDuration;
+
+            Vector3 panTargetPos = missionType == 4 ? missionObjective.transform.position : shockerPanTargetPos;
+            Vector3 targetPos = new Vector3(panTargetPos.x, panTargetPos.y, originalCameraPos.z);
+
+            if (panProgress >= 1f)
+            {
+                cameraPanning = false;
+
+                if (missionType == 3)
+                {
+                    cameraPinned = true;
+                    cameraPinnedPos = targetPos;
+                }
+
+                if (missionType == 3 && chaseTarget != null && !chaseTarget.forceRunAway)
+                    chaseTarget.forceRunAway = true;
+
+                if (!startAlarm5) { startAlarm5 = true; alarm5 = 300; alarm6 = 200; }
+            }
+            else if (missionType == 4 && virtualCamera != null)
+            {
+                // explosive keeps its existing Cinemachine-follow behavior
+            }
+            else
+            {
+                float easedProgress = Mathf.SmoothStep(0f, 1f, panProgress);
+                Camera.main.transform.position = Vector3.Lerp(originalCameraPos, targetPos, easedProgress);
+            }
+        }
+
+        // Keep the camera locked here every frame after the pan finishes, independent of cameraPanning
+        if (cameraPinned)
+        {
+            player.stopMove = true;
+            Camera.main.transform.position = cameraPinnedPos;
+        }
+
+        if (completed && !done)
+        {
+            uiComplete.canvasRenderer.SetAlpha(1);
+            uiComplete.rectTransform.anchoredPosition = Vector2.zero;
+            uiComplete.sprite = sprTimerComplete[indexC];
+
+            if (animateC)
+            {
+                alarm3 = 2;
+                animateC = false;
+            }
+        }
+
+        if (done)
+        {
+            uiComplete.canvasRenderer.SetAlpha(0);
+
+            foreach (GameObject b in barriers)
+            {
+                if (b != null)
+                    Destroy(b);
+            }
+
+            Destroy(gameObject);
+        }
+    }
+}
